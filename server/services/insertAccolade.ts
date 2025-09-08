@@ -44,7 +44,7 @@ import { handleStreakAccolade } from "./singleAccolads/handleStreakAccolade";
 export const insertAccolade = async (
   user: User,
   symbol: string,
-  fund: number = 0
+  Current_progress: number = 0
 ) => {
   const userId = user.id;
 
@@ -99,7 +99,7 @@ export const insertAccolade = async (
     case "genesis_member":
     case "gemlaunch_pioneer":
     case "early_adopter":
-    case "user_join_rank" : {  // user_join_rank is maked by me.
+    case "user_join_rank" :  {  // user_join_rank is maked by me.
       // if (progress?.completed) {  
       //   return { message: `${symbol} already unlocked`, progress };
       // }
@@ -118,7 +118,7 @@ export const insertAccolade = async (
           .returning();
       }
 
-      const currentRank = record.value + 1; // next user’s placement
+      const currentRank =(parseInt(record.value) + 1).toString(); // next user’s placement
 
       // Update global counter
       await db
@@ -161,7 +161,7 @@ export const insertAccolade = async (
     }
 
 
-
+    case "launch_master":
     case "first_funding": {
       if (progress?.completed) {
         return { message: "First Funder already unlocked", progress };
@@ -237,7 +237,7 @@ export const insertAccolade = async (
         return { message: "Already unlocked", progress: progress.progress };
       }
 
-      const totalFunded = Number(fund ?? 0);
+      const totalFunded = Number(Current_progress ?? 0);
 
       // Get current global record
       const [record] = await db
@@ -297,7 +297,7 @@ export const insertAccolade = async (
         return { message: "Already unlocked", progress: progress.progress };
       }
 
-      const newProgress = (progress?.progress ?? 0) + 1;
+      const newProgress = Current_progress;
 
       // Update progress
       await storage.updateAccoladeProgress({

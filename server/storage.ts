@@ -753,7 +753,7 @@ async updateAccoladeProgress({
     if (progress > existing.progress) {
       await db
         .update(accoladeProgress)
-        .set({ progress })
+        .set({ progress , completed })
         .where(eq(accoladeProgress.id, existing.id));
     }
     return { updated: true, progress: Math.max(progress, existing.progress), target };
