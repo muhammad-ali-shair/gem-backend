@@ -20,7 +20,9 @@ import {
   type InsertBlockchainEvent,
   type UserWallet,
   type InsertUserWallet,
-  accoladeProgress
+  accoladeProgress,
+  gemAccolades,
+  GemAccolades
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, sum, count, and, inArray, or } from "drizzle-orm";
@@ -468,6 +470,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(pointConfigs.isActive, true));
   }
 
+  async getGemAccolades(): Promise<GemAccolades[]> {
+    return await db
+      .select()
+      .from(gemAccolades);
+      // .where(eq(gemAccolades.isActive, true));
+  }
+
   async updatePointConfig(activityType: string, basePoints: number): Promise<void> {
     await db
       .update(pointConfigs)
@@ -477,6 +486,16 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(pointConfigs.activityType, activityType));
   }
+
+  async updateGemAccolades(activityType: string, pointsBonus: number): Promise<void> {
+    await db
+      .update(gemAccolades)
+      .set({ 
+        pointsBonus
+      })
+      .where(eq(gemAccolades.symbol, activityType));
+  }
+  
 
   async getReferralLeaderboard(limit = 100): Promise<Array<{ user: User; qualifiedReferrals: number; totalReferralPoints: number; rank: number }>> {
    const result = await db

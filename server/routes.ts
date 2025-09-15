@@ -22,7 +22,7 @@ const GRAPHQL_URL = "https://api.studio.thegraph.com/query/120239/gempad/0.0.3";
 const GRAPHQL_URL_LaunchPads =
   "https://api.studio.thegraph.com/query/120239/launchpad-subgraph/0.0.2";
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.post("/api/get/tokens", async (req, res) => {
+  app.post("/api/get/tokens", async (req, res) => { 
     const { owner } = req.body;
 
     if (!owner) {
@@ -213,13 +213,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Activity routes
   app.post("/api/activities", async (req, res) => {
     try {
-      const activityData = insertActivitySchema.parse(req.body);
-      const activity = await storage.createActivity(activityData);
+      // const activityData = insertActivitySchema.parse(req.body);
+      // const activity = await storage.createActivity(activityData);
+      const { userAddress , points } = req.body;
 
+      console.log('first', { userAddress , points })
+      const user = await storage.getUserByWalletAddress(userAddress);
+        if (!user) {
+          return res.status(404).json({ error: "User not found" });
+         }
       // Broadcast activity update via WebSocket
-      broadcastUpdate({ type: "activity", data: activity });
-
-      res.json(activity);
+      // broadcastUpdate({ type: "activity", data: activity });
+      storage.updateUserPoints(user.id , points);
+      res.status(200).json({ success: true , message : 'Points updated successfully' });
     } catch (error) {
       res.status(400).json({
         error: error instanceof Error ? error.message : "Invalid activity data",
@@ -325,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Point configuration routes (admin)
   app.get("/api/point-configs", async (req, res) => {
     try {
-      const configs = await storage.getPointConfigs();
+      const configs = await storage.getGemAccolades();
       res.json(configs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch point configs" });
@@ -335,13 +341,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/point-configs/:activityType", async (req, res) => {
     try {
       const { activityType } = req.params;
-      const { basePoints } = req.body;
+      const { pointsBonus } = req.body;
 
-      if (!basePoints || basePoints < 0) {
+      if (!pointsBonus || pointsBonus < 0) {
         return res.status(400).json({ error: "Invalid base points value" });
       }
 
-      await storage.updatePointConfig(activityType, basePoints);
+      await storage.updateGemAccolades(activityType, pointsBonus);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update point config" });
