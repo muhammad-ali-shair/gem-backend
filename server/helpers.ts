@@ -153,7 +153,6 @@ import { and, eq, sql } from "drizzle-orm";
           points: input.points ?? 0,
         })
         .returning();
-    
       return newLog;
     }
     ///////////////////////////////////////////////////

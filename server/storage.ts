@@ -6,6 +6,7 @@ import {
   pointConfigs, 
   blockchainEvents,
   userWallets,
+  gemAccolades,
   type User, 
   type InsertUser,
   type Activity,
@@ -262,6 +263,34 @@ export class DatabaseStorage implements IStorage {
     await this.updateUserPoints(activity.userId, activity.points);
     
     return newActivity;
+  }
+
+   async hasTwentyAccolades(userId: number): Promise<boolean> {
+    const result = await db
+      .select({
+        count: sql<number>`COUNT(DISTINCT ${accolades.accoladeType})`
+      })
+      .from(accolades)
+      .where(eq(accolades.userId, userId));
+  
+    const count = result[0]?.count ?? 0;
+    return count >= 20;
+  }
+
+
+  async checkAccolade(userId: number, accoladeName: string): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(accolades)
+      .where(
+        and(
+          eq(accolades.userId, userId),
+          eq(accolades.accoladeType, accoladeName)
+        )
+      )
+      .limit(1);
+  
+    return result.length > 0;
   }
 
   async getUserActivities(userId: number, limit = 50): Promise<Activity[]> {
@@ -651,6 +680,11 @@ profileData)
       ...r.accolade,
       user: r.user
     }));
+  }
+  async getAllAccoladesWithoutUser(): Promise<Array<any>> {
+    return await db
+      .select()
+      .from(gemAccolades);
   }
 
   async resetPioneerAccolades(): Promise<void> {

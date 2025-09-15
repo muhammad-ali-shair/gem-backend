@@ -47,7 +47,7 @@ export const insertAccolade = async (
   Current_progress: number = 0
 ) => {
   const userId = user.id;
-
+  console.log({userId})
   // 1. Fetch accolade definition
   const [accoladeDef] = await db
     .select()
