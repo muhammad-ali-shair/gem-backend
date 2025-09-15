@@ -161,7 +161,7 @@ export const insertAccolade = async (
     }
 
 
-    case "launch_master":
+    
     case "first_funding": {
       if (progress?.completed) {
         return { message: "First Funder already unlocked", progress };
