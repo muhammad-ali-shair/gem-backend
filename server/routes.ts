@@ -16,7 +16,7 @@ import { socialMediaAnalyzer } from "./services/ai";
 import { eq } from "drizzle-orm";
 import { insertAccolade } from "./services/insertAccolade";
 import { accoladeQueue } from "./queues/accoladeQueue";
-import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
+import { checkFairLaunchSuccess, convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
 // import { redis } from "./redis/conectionCheck";
 
@@ -183,25 +183,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch user activities" });
     }
   });
-
-  app.get("/api/activities/recent", async (req, res) => {
+// waseem
+  app.get("/api/activities/recent/:walletAddress", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 20;
       // Only show activities for connected wallet if specified
-      const walletAddress = req.query.wallet as string;
+      const { walletAddress } = req.params;
       if (walletAddress) {
         const user = await storage.getUserByWalletAddress(walletAddress);
         if (user) {
-          const activities = await storage.getUserActivities(user.id, limit);
+          const activities = await getUserAccoladesHistory({userId: user.id.toString(), limit, page: 1});
           // Filter out accolade activities to show only point-earning activities
-          const pointActivities = activities.filter(
-            (activity) => activity.activityType !== "accolade_earned"
-          );
-          return res.json(
-            pointActivities.map((activity) => ({
-              ...activity,
-              user: user,
-            }))
+          return res.status(200).json(
+           { status: 200, message: "History fetched successfully", data: {activities}}
           );
         }
       }
@@ -1165,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const successfulLaunchPads = countSuccessfulLaunchpads(data.data.launchpads);
     const user = await storage.getUserByWalletAddress(owner);
     if(successfulLaunchPads > 1){
-      await insertAccolade(user, "launch_master");
+      await insertAccolade(user as User, "launch_master");
     }
     res.status(200).json({status: 200, message: "If exists",data: {"launch_master": successfulLaunchPads > 1, total_launchpads: data.data.launchpads.length || 0, successfulLaunchPads } })
     
@@ -1180,7 +1174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // }
   })
   // FIRST FUNDER 
-  const firstFunderReward = async ({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User, launchpadGraph: string, isGiven: Boolean}) => {
+  const firstFunderReward = async ({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
     if(!isGiven){
       let given = false;
       let query = `
@@ -1194,8 +1188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `;
       const fairlaunchPurchases:any = await runGraphQLQuery(graph, query, {buyer: wallet, minAmount: "0"});
       if(!fairlaunchPurchases.errors && fairlaunchPurchases.data && fairlaunchPurchases.data.purchaseEntities.length > 0){
-        await insertAccolade(user, "first_funder");
-        await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funder", userId: user.id, description: "You bought fairlaunch token!", points: 200});
+        console.log(await insertAccolade(user as User, "first_funding"));
+        await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user.id, description: "You bought fairlaunch token!", points: 200});
         given = true
       }
       if(!given){
@@ -1210,18 +1204,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const launchpadPurchases:any = await runGraphQLQuery(launchpadGraph, launchPadsQuery, {buyer: wallet, minAmount: "0"});
         console.log({launchpadPurchases: launchpadPurchases.data.purchases})
         if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases){
-          await insertAccolade(user, "first_funder");
-          await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funder", userId: user.id, description: "You bought launchpad token!", points: 200});
+          console.log(await insertAccolade(user as User, "first_funding"));
+          await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user.id, description: "You bought launchpad token!", points: 200});
           given = true
         }
       }
     }    
   }
-  const failaunchMaster = async({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User, launchpadGraph: string, isGiven: Boolean}) => {
+  const failaunchMaster = async({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
     if(!isGiven){
-
+      const query = `
+      query MyQuery($owner: String!) {
+        fairLaunchEntities(where: { owner: $owner }) {
+          owner
+          softCap
+          token
+          purchases {
+            amount
+          }
+        }
+      }
+    `;
+      const fairlaunchs:any = await runGraphQLQuery(graph, query, {owner: wallet});
+      console.log({fairlaunchs});
+      if(fairlaunchs && fairlaunchs?.data && fairlaunchs?.data?.fairLaunchEntities){
+          const isSuccessfull = isAnyFairLaunchSuccessful(fairlaunchs?.data?.fairLaunchEntities);
+          if(isSuccessfull){
+            await insertAccolade(user as User, "launch_master");
+            await createAccoladeLog({accoladeName: "Launch Master", accoladeType: "launch_master", userId: user.id, description: "Successfully completed a fairlaunch project", points: 200})
+          }
+      }
     }
   }
+  const tokenCreatorAndSerialCreator = async ({wallet, graph, user, isGiven = false}: {wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
+    if(!isGiven){
+      const query = `
+      query MyQuery($owner: String!) {
+        tokens(where: {owner: $owner}) {
+          name
+          tokenType
+          symbol
+          owner
+          id
+        }
+      }
+    `;
+    const tokens:any = await runGraphQLQuery(graph, query, {owner: wallet});
+    console.log({tokens })
+    if (tokens && !tokens?.errors && tokens?.data?.tokens?.length !== 0) {
+      await insertAccolade(user as User, "token_creator");
+      await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points: 200 });
+      if (tokens.data.tokens.length >= 5) {
+        await insertAccolade(user as User, "serial_creator", 5);
+        // create accolade log to continue
+        await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points: 200 });     
+      }
+    }
+    }
+  };
+
   // TOKENS
   app.post("/api/get/tokens", async (req, res) => {
     const { owner } = req.body;
@@ -1236,7 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           symbol
           owner
           id
-        }                                              
+        }
       }
     `;
     try {
@@ -1252,7 +1293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (data.data.tokens.length === 0) {
         sendResponse(res, 200,"No token(s) found", {tokens: 0}); 
       }
-      let user = await storage.getUserByWalletAddress(owner);
+      let user:any = await storage.getUserByWalletAddress(owner);
       let reward = {token_creator: false, serial_creator: false};
       if (data.data.tokens.length >= 1) {
         await insertAccolade(user as User, "token_creator");
@@ -1267,13 +1308,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // check first funder - deposit in any token
-      firstFunderReward({wallet : "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH})     
+
       sendResponse(res, 200,"Token fetched successfully", { tokens: data.data.tokens.length, serial_creator: reward.serial_creator, token_creator: reward.token_creator }); 
     } catch (error) {
       console.error(error);
       sendResponse(res, 500,"Something went wrong", null); 
     }
   });
+  
+  
+  
   //AVAILBLE ACCOLADES
   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
@@ -1282,10 +1326,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
+      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
+      await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
+      await failaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
       const accolades = await getAllAccoladesForUser(user.id);
-      sendResponse(res, 200, "All accolades fetched successfully", accolades.rows || []);
+      console.log(accolades.rows);
+      sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
     } catch (err) {
-      console.error({ err });
       sendResponse(res, 500, "Something went wrong", null);
     }
   });
