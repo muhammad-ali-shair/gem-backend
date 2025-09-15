@@ -33,7 +33,69 @@ const GRAPHQL_URL_LaunchPads =
   "https://api.studio.thegraph.com/query/120239/launchpad-subgraph/0.0.2";
 const TOKENS_SUBGRPH = "https://api.studio.thegraph.com/query/120239/launchpad-subgraph/0.0.2"
 export async function registerRoutes(app: Express): Promise<Server> {
-  
+  app.post("/api/get/tokens", async (req, res) => { 
+    const { owner } = req.body;
+
+    if (!owner) {
+      return res.status(400).json({ error: "Owner address is required" });
+    }
+
+    const query = `
+      query MyQuery($owner: String!) {
+        tokens(where: {owner: $owner}) {
+          name
+          tokenType
+          symbol
+          owner
+          id
+        }
+      }
+    `;
+
+    try {
+      const response = await fetch(GRAPHQL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          variables: { owner },
+        }),
+      });
+
+      const data = await response.json();
+      // console.log('data', data)
+      if (data.data.tokens.length === 0) {
+        res.status(200).json({ message: "No tokens found for this owner." });
+      }
+
+      let user = await storage.getUserByWalletAddress(owner);
+
+      if (!user) {
+        const referralCode = Math.random()
+          .toString(36)
+          .substring(2, 8)
+          .toUpperCase();
+        user = await storage.createUser({
+          walletAddress: owner,
+          totalPoints: 0,
+          referralCode,
+          referredBy: null,
+        });
+      }
+
+      if (data.data.tokens.length >= 1) {
+        await insertAccolade(user, "token_creator");
+      }
+      if (data.data.tokens.length >= 5) {
+        await insertAccolade(user, "serial_creator", 5);
+      }
+
+      return res.json(data.data.tokens);
+    } catch (error) {
+      console.error("GraphQL fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch tokens" });
+    }
+  });
 
   app.post("/api/get/first-funder", async (req, res) => {
     const { owner } = req.body;
@@ -159,13 +221,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Activity routes
   app.post("/api/activities", async (req, res) => {
     try {
-      const activityData = insertActivitySchema.parse(req.body);
-      const activity = await storage.createActivity(activityData);
+      // const activityData = insertActivitySchema.parse(req.body);
+      // const activity = await storage.createActivity(activityData);
+      const { userAddress , points } = req.body;
 
+      console.log('first', { userAddress , points })
+      const user = await storage.getUserByWalletAddress(userAddress);
+        if (!user) {
+          return res.status(404).json({ error: "User not found" });
+         }
       // Broadcast activity update via WebSocket
-      broadcastUpdate({ type: "activity", data: activity });
-
-      res.json(activity);
+      // broadcastUpdate({ type: "activity", data: activity });
+      storage.updateUserPoints(user.id , points);
+      res.status(200).json({ success: true , message : 'Points updated successfully' });
     } catch (error) {
       res.status(400).json({
         error: error instanceof Error ? error.message : "Invalid activity data",
@@ -258,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Point configuration routes (admin)
   app.get("/api/point-configs", async (req, res) => {
     try {
-      const configs = await storage.getPointConfigs();
+      const configs = await storage.getGemAccolades();
       res.json(configs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch point configs" });
@@ -268,13 +336,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/point-configs/:activityType", async (req, res) => {
     try {
       const { activityType } = req.params;
-      const { basePoints } = req.body;
+      const { pointsBonus } = req.body;
 
-      if (!basePoints || basePoints < 0) {
+      if (!pointsBonus || pointsBonus < 0) {
         return res.status(400).json({ error: "Invalid base points value" });
       }
 
-      await storage.updatePointConfig(activityType, basePoints);
+      await storage.updateGemAccolades(activityType, pointsBonus);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update point config" });

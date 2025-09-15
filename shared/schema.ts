@@ -220,6 +220,7 @@ export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type Accolade = typeof accolades.$inferSelect;
 export type InsertAccolade = z.infer<typeof insertAccoladeSchema>;
 export type PointConfig = typeof pointConfigs.$inferSelect;
+export type GemAccolades = typeof gemAccolades.$inferSelect;
 export type InsertPointConfig = z.infer<typeof insertPointConfigSchema>;
 export type BlockchainEvent = typeof blockchainEvents.$inferSelect;
 export type InsertBlockchainEvent = z.infer<typeof insertBlockchainEventSchema>;
