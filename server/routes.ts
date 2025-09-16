@@ -24,6 +24,7 @@ import { db } from "./db";
 //waseem
   const LAUNCHPAD_SUBGRAPH = "https://api.studio.thegraph.com/query/120543/launchpad-gempad-bsc/0.0.4"
   const FAIRLAUCH_SUBGRAPH = "https://api.studio.thegraph.com/query/120543/fairlaunch-gempad-bsc/0.0.6";
+  const TOKEN_SUBGRAPH = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4"
   const GRAPHQL_URL_TOKEN = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4";
 //
 
@@ -1254,10 +1255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return result[0].points;
     }
     return 0; // fallback
-  };
-
- 
-  
+  };  
   // FIRST FUNDER - FAIRLAUNCH AND LAUNCHPAD FIRST TOKEN
   const firstFunderReward = async ({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
     if(!isGiven){
@@ -1338,7 +1336,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     `;
     const tokens:any = await runGraphQLQuery(graph, query, {owner: wallet});
-    console.log({tokens })
     if (tokens && !tokens?.errors && tokens?.data?.tokens?.length !== 0) {
       await insertAccolade(user as User, "token_creator");
       const points = await getAccoladePoints("token_creator");
@@ -1380,14 +1377,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
    //AVAILBLE ACCOLADES
-   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
+  app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
       const { wallet_address } = req.params;
       const user: User | undefined = await storage.getUserByWalletAddress(wallet_address);
       if (!user) {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
-      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
+      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: TOKEN_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
       await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
       await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
       await fundingVeteranHandler({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}) 
