@@ -18,6 +18,7 @@ import { insertAccolade } from "./services/insertAccolade";
 import { accoladeQueue } from "./queues/accoladeQueue";
 import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
+import { db } from "./db";
 // import { redis } from "./redis/conectionCheck";
 
 //waseem
@@ -1242,6 +1243,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     //   res.status(200).json({status: 200, message: "If exists",data: {"funding_veteran": true, total_launchpads: data.data.launchpads.length || 0, total_volume_usdc: totalUSDC, total_volume_bnb: totalBNB  } })
   // }
   })
+  const getAccoladePoints = async (accoladeType: string): Promise<number> => {
+    const result = await db
+      .select({ points: gemAccolades.pointsBonus })
+      .from(gemAccolades)
+      .where(eq(gemAccolades.symbol, accoladeType))
+      .limit(1);
+  
+    if (result.length > 0 && result[0].points !== null) {
+      return result[0].points;
+    }
+    return 0; // fallback
+  };
+
+ 
+  
   // FIRST FUNDER - FAIRLAUNCH AND LAUNCHPAD FIRST TOKEN
   const firstFunderReward = async ({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
     if(!isGiven){
@@ -1257,8 +1273,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `;
       const fairlaunchPurchases:any = await runGraphQLQuery(graph, query, {buyer: wallet, minAmount: "0"});
       if(!fairlaunchPurchases.errors && fairlaunchPurchases.data && fairlaunchPurchases.data.purchaseEntities.length > 0){
-        console.log(await insertAccolade(user as User, "first_funding"));
-        await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought fairlaunch token!", points: 200});
+        await insertAccolade(user as User, "first_funding");
+        const points = await getAccoladePoints("first_funding");
+        await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought fairlaunch token!", points});
         given = true
       }
       if(!given){
@@ -1273,8 +1290,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const launchpadPurchases:any = await runGraphQLQuery(launchpadGraph, launchPadsQuery, {buyer: wallet, minAmount: "0"});
         console.log({launchpadPurchases: launchpadPurchases.data.purchases})
         if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases){
-          console.log(await insertAccolade(user as User, "first_funding"));
-          await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought launchpad token!", points: 200});
+          await insertAccolade(user as User, "first_funding")
+          const points = await getAccoladePoints("first_funding");
+          await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought launchpad token!", points});
           given = true
         }
       }
@@ -1300,7 +1318,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const isSuccessfull = isAnyFairLaunchSuccessful(fairlaunchs?.data?.fairLaunchEntities);
           if(isSuccessfull){
             await insertAccolade(user as User, "launch_master");
-            await createAccoladeLog({accoladeName: "Launch Master", accoladeType: "launch_master", userId: user ? user.id : 0, description: "Successfully completed a fairlaunch project", points: 200})
+            const points = await getAccoladePoints("launch_master");
+            await createAccoladeLog({accoladeName: "Launch Master", accoladeType: "launch_master", userId: user ? user.id : 0, description: "Successfully completed a fairlaunch project", points})
           }
       }
     }
@@ -1322,11 +1341,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log({tokens })
     if (tokens && !tokens?.errors && tokens?.data?.tokens?.length !== 0) {
       await insertAccolade(user as User, "token_creator");
-      await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points: 200 });
+      const points = await getAccoladePoints("token_creator");
+      await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points });
       if (tokens.data.tokens.length >= 5) {
         await insertAccolade(user as User, "serial_creator", 5);
         // create accolade log to continue
-        await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points: 200 });     
+        const points = await getAccoladePoints("serial_creator");
+        await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points });     
       }
     }
     }
@@ -1351,12 +1372,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if(totalUSDC >= THRESHOLD){
         await insertAccolade(user as User, "funding_veteran");
         if(user){
-          await createAccoladeLog({accoladeName: "Funding Veteran", accoladeType: "funding_veteran", userId: user?.id, description: "Successfully invested 5000 USDC", points: 200})
+          const points = await getAccoladePoints("funding_veteran");
+          await createAccoladeLog({accoladeName: "Funding Veteran", accoladeType: "funding_veteran", userId: user?.id, description: "Successfully invested 5000 USDC", points})
         }
       }
 
     }
   }
+   //AVAILBLE ACCOLADES
+   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
+    try {
+      const { wallet_address } = req.params;
+      const user: User | undefined = await storage.getUserByWalletAddress(wallet_address);
+      if (!user) {
+        return sendResponse(res, 500, "Invalid wallet address found", null);
+      }
+      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
+      await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
+      await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
+      await fundingVeteranHandler({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}) 
+      const accolades = await getAllAccoladesForUser(user.id);
+      console.log(accolades.rows);
+      sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
+    } catch (err) {
+      console.log({err})
+      sendResponse(res, 500, "Something went wrong", null);
+    }
+  });
   // TOKENS
   app.post("/api/get/tokens", async (req, res) => {
     const { owner } = req.body;
@@ -1409,26 +1451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sendResponse(res, 500,"Something went wrong", null); 
     }
   });
-  //AVAILBLE ACCOLADES
-  app.get("/api/available/accolades/:wallet_address", async (req, res) => {
-    try {
-      const { wallet_address } = req.params;
-      const user: User | undefined = await storage.getUserByWalletAddress(wallet_address);
-      if (!user) {
-        return sendResponse(res, 500, "Invalid wallet address found", null);
-      }
-      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
-      await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
-      await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
-      await fundingVeteranHandler({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}) 
-      const accolades = await getAllAccoladesForUser(user.id);
-      console.log(accolades.rows);
-      sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
-    } catch (err) {
-      console.log({err})
-      sendResponse(res, 500, "Something went wrong", null);
-    }
-  });
+ 
   // CREATE LOGS
   
 
