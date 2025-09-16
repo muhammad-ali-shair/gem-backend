@@ -1,0 +1,42 @@
+# Use Node.js 20 LTS as base image
+FROM node:20-alpine
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy backend source code
+COPY server/ ./server/
+COPY shared/ ./shared/
+COPY scripts/ ./scripts/
+COPY drizzle.config.ts ./
+COPY tsconfig.json ./
+
+# Copy environment template (you'll need to provide actual .env)
+COPY .env.template ./
+
+# Install tsx globally for running TypeScript
+RUN npm install -g tsx
+
+# Create dist directory
+RUN mkdir -p dist
+
+# Build the backend
+RUN npm run build
+
+# Expose the port your backend runs on
+EXPOSE 5000
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Start the backend server
+CMD ["npm", "start"]

@@ -223,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ error: "User not found" });
          }
       // Broadcast activity update via WebSocket
-      // broadcastUpdate({ type: "activity", data: activity });
+      // broadcastUpdate({ type: "activity", data: activity }); 
       storage.updateUserPoints(user.id , points);
       res.status(200).json({ success: true , message : 'Points updated successfully' });
     } catch (error) {

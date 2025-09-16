@@ -86,7 +86,7 @@ async function main() {
       activityType: "referral",
       basePoints: 50,
       description: "Points for referring a user",
-    },
+     },
     {
       activityType: "social_share",
       basePoints: 10,

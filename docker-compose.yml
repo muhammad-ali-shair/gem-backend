@@ -19,8 +19,30 @@
 # volumes:
 #   postgres_data:
 
-
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://gem-launch:gem-launch-db-yourpassword@db:5432/gem-launch-db
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   db:
     image: postgres:15-alpine
     ports:
@@ -42,7 +64,7 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "24325:6379"   # 👈 expose Redis on localhost:24325
+      - "24325:6379" # 👈 expose Redis on localhost:24325
     volumes:
       - redis_data:/data
     restart: unless-stopped
