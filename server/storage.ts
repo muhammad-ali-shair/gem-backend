@@ -397,7 +397,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUserReferrals(
   userId: number
-): Promise<Array<Referral & { referee: User }>> {
+    ): Promise<Array<Referral & { referee: User }>> {
   const result = await db
     .select({
       id: referrals.id,
@@ -462,7 +462,7 @@ export class DatabaseStorage implements IStorage {
       parentUserId: row.referee_parentUserId
     },
   }));
-}
+  }
 
   async getReferralStats(userId: number): Promise<{ count: number; totalPoints: number }> {
     // const { sqlite } = await import('./db');
