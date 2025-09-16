@@ -1242,7 +1242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     //   res.status(200).json({status: 200, message: "If exists",data: {"funding_veteran": true, total_launchpads: data.data.launchpads.length || 0, total_volume_usdc: totalUSDC, total_volume_bnb: totalBNB  } })
   // }
   })
-  // FIRST FUNDER 
+  // FIRST FUNDER - FAIRLAUNCH AND LAUNCHPAD FIRST TOKEN
   const firstFunderReward = async ({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
     if(!isGiven){
       let given = false;
@@ -1344,14 +1344,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     `;
     const data:any = await runGraphQLQuery(LAUNCHPAD_SUBGRAPH, query, {owner: wallet});
-    const totalBNB = getTotalRaisedInBNB(data.data.launchpads);
-    const totalUSDC = await convertBNBtoUSDC(totalBNB);
-    const THRESHOLD = 5000;
-    if(totalUSDC >= THRESHOLD){
-      await insertAccolade(user as User, "funding_veteran");
-      if(user){
-        await createAccoladeLog({accoladeName: "Funding Veteran", accoladeType: "funding_veteran", userId: user?.id, description: "Successfully invested 5000 USDC", points: 200})
+    if(data?.data && data?.data?.launchpads?.length !== 0){
+      const totalBNB = getTotalRaisedInBNB(data.data.launchpads);
+      const totalUSDC = await convertBNBtoUSDC(totalBNB);
+      const THRESHOLD = 5000;
+      if(totalUSDC >= THRESHOLD){
+        await insertAccolade(user as User, "funding_veteran");
+        if(user){
+          await createAccoladeLog({accoladeName: "Funding Veteran", accoladeType: "funding_veteran", userId: user?.id, description: "Successfully invested 5000 USDC", points: 200})
+        }
       }
+
     }
   }
   // TOKENS
@@ -1422,6 +1425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(accolades.rows);
       sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
     } catch (err) {
+      console.log({err})
       sendResponse(res, 500, "Something went wrong", null);
     }
   });
