@@ -1,9 +1,6 @@
 import IORedis from "ioredis";
 
-export const redis = new IORedis({
-  host: "127.0.0.1",
-  port: 24325,
-});
+export const redis = new IORedis(process.env.REDIS_URL || "redis://127.0.0.1:24325");
 
 redis.on("connect", () => {
   console.log("✅ Redis connected");

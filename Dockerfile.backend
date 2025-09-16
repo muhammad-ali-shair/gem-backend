@@ -8,10 +8,10 @@ RUN apk add --no-cache curl
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package*.json ./ 
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including devDependencies for build)
+RUN npm ci
 
 # Copy backend source code
 COPY server/ ./server/
@@ -23,14 +23,13 @@ COPY tsconfig.json ./
 # Copy environment template (you'll need to provide actual .env)
 COPY .env.template ./
 
-# Install tsx globally for running TypeScript
-RUN npm install -g tsx
-
 # Create dist directory
 RUN mkdir -p dist
 
-# Build the backend
-RUN npm run build
+# Build only the backend (skip vite build for frontend)
+RUN npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+# Keep all dependencies since some "dev" dependencies are needed at runtime
 
 # Expose the port your backend runs on
 EXPOSE 5000
@@ -38,5 +37,5 @@ EXPOSE 5000
 # Set environment to production
 ENV NODE_ENV=production
 
-# Start the backend server
-CMD ["npm", "start"]
+# Start the backend server directly without cross-env
+CMD ["node", "dist/index.js"]

@@ -7,9 +7,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const connection = new IORedis({
-  host: "127.0.0.1",
-  port: 24325,
+const connection = new IORedis(process.env.REDIS_URL || "redis://127.0.0.1:24325", {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });

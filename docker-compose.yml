@@ -28,7 +28,7 @@ services:
       - "5000:5000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://gem-launch:gem-launch-db-yourpassword@db:5432/gem-launch-db
+      - DATABASE_URL=postgresql://gem-launch:gem-launch-db-yourpassword@db:5432/gem-launch-db?sslmode=disable
       - REDIS_URL=redis://redis:6379
     depends_on:
       db:
