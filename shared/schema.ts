@@ -3,6 +3,7 @@ import { pgTable, text, integer, real, boolean, timestamp, uniqueIndex, numeric 
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { serial, varchar } from "drizzle-orm/mysql-core";
 
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -59,6 +60,17 @@ export const gemAccolades = pgTable("gem_accolades", {
   pointsBonus: integer("points_bonus").default(0).notNull(),
   rarity: text("rarity"),
 });
+
+export const accoladesHistory = pgTable("accolades_history", (t) => ({
+  id: t.serial("id").primaryKey(),
+  accoladeType: t.varchar("accolade_type", { length: 100 }).notNull(),
+  accoladeName: t.varchar("accolade_name", { length: 150 }).notNull(),
+  description: t.text("description"),
+  userId: t.integer("user_id").notNull(),
+  points: t.integer("points").default(0),
+  createdAt: t.timestamp("created_at").defaultNow().notNull(),
+}));
+
 
 export const accolades = pgTable("accolades", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

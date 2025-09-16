@@ -9,18 +9,29 @@ import {
   insertActivitySchema,
   insertPointConfigSchema,
   gemAccolades,
+  User,
 } from "@shared/schema";
 import { z } from "zod";
 import { socialMediaAnalyzer } from "./services/ai";
 import { eq } from "drizzle-orm";
 import { insertAccolade } from "./services/insertAccolade";
 import { accoladeQueue } from "./queues/accoladeQueue";
+import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
+import { useTransition } from "react";
 // import { redis } from "./redis/conectionCheck";
+
+//waseem
+  const LAUNCHPAD_SUBGRAPH = "https://api.studio.thegraph.com/query/120543/launchpad-gempad-bsc/0.0.4"
+  const FAIRLAUCH_SUBGRAPH = "https://api.studio.thegraph.com/query/120543/fairlaunch-gempad-bsc/0.0.6";
+  const GRAPHQL_URL_TOKEN = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4";
+//
+
 
 const GRAPHQL_URL = "https://api.studio.thegraph.com/query/120239/gempad/0.0.3";
 
 const GRAPHQL_URL_LaunchPads =
   "https://api.studio.thegraph.com/query/120239/launchpad-subgraph/0.0.2";
+const TOKENS_SUBGRPH = "https://api.studio.thegraph.com/query/120239/launchpad-subgraph/0.0.2"
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/get/tokens", async (req, res) => { 
     const { owner } = req.body;
@@ -95,21 +106,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // GraphQL query to check launchpads created by this owner
     const query = `
-    query ($owner: String!) {
-      launchpadCreateds(where: { launchpad: $owner }) {
-        id
-        info_token
-        info_softCap
-        info_hardCap
+      query ($owner: String!) {
+        launchpadCreateds(where: { launchpad: $owner }) {
+          id
+          info_token
+          info_softCap
+          info_hardCap
+        }
+        fairLaunchCreateds(where: { fairLaunch: $owner }) {
+          id
+          _info_token
+          _info_softCap
+          _info_totalsellTokens
+        }
       }
-      fairLaunchCreateds(where: { fairLaunch: $owner }) {
-        id
-        _info_token
-        _info_softCap
-        _info_totalsellTokens
-      }
-    }
-  `;
+    `;
 
     try {
       const response = await fetch(GRAPHQL_URL, {
@@ -153,7 +164,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to fetch data" });
     }
   });
-
   // User routes
   app.post("/api/users", async (req, res) => {
     try {
@@ -188,7 +198,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch user" });
     }
   });
-
   // Leaderboard routes
   app.get("/api/leaderboard", async (req, res) => {
     try {
@@ -209,7 +218,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch user rank" });
     }
   });
-
   // Activity routes
   app.post("/api/activities", async (req, res) => {
     try {
@@ -225,6 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Broadcast activity update via WebSocket
       // broadcastUpdate({ type: "activity", data: activity }); 
       storage.updateUserPoints(user.id , points);
+      await createAccoladeLog({accoladeName: "Gem Launch", accoladeType: "gem_launch_points", userId: user.id, description: "Gem launch has gifted you points", points: Number(points)})
       res.status(200).json({ success: true , message : 'Points updated successfully' });
     } catch (error) {
       res.status(400).json({
@@ -243,38 +252,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch user activities" });
     }
   });
-
-  app.get("/api/activities/recent", async (req, res) => {
+// waseem
+  app.get("/api/activities/recent/:walletAddress", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 20;
-
       // Only show activities for connected wallet if specified
-      const walletAddress = req.query.wallet as string;
+      const { walletAddress } = req.params;
       if (walletAddress) {
         const user = await storage.getUserByWalletAddress(walletAddress);
         if (user) {
-          const activities = await storage.getUserActivities(user.id, limit);
+          const activities = await getUserAccoladesHistory({userId: user.id.toString(), limit, page: 1});
           // Filter out accolade activities to show only point-earning activities
-          const pointActivities = activities.filter(
-            (activity) => activity.activityType !== "accolade_earned"
-          );
-          return res.json(
-            pointActivities.map((activity) => ({
-              ...activity,
-              user: user,
-            }))
+          return res.status(200).json(
+           { status: 200, message: "History fetched successfully", data: {activities}}
           );
         }
       }
-
-      // Fallback to global activities if no wallet specified
       const activities = await storage.getRecentActivities(limit);
       res.json(activities);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch recent activities" });
     }
   });
-
   // Referral routes
   app.get("/api/users/:id/referrals", async (req, res) => {
     try {
@@ -295,7 +294,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch referral stats" });
     }
   });
-
   // Accolade routes
   app.get("/api/users/:id/accolades", async (req, res) => {
     try {
@@ -306,7 +304,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch accolades" });
     }
   });
-
   // Get current user's accolades
   app.get("/api/user/accolades", async (req, res) => {
     try {
@@ -327,7 +324,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch accolades" });
     }
   });
-
   // Point configuration routes (admin)
   app.get("/api/point-configs", async (req, res) => {
     try {
@@ -353,7 +349,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to update point config" });
     }
   });
-
   // Blockchain monitoring routes
   app.get("/api/blockchain/status", async (req, res) => {
     try {
@@ -372,7 +367,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to process blockchain events" });
     }
   });
-
   // Monitor real Gemlaunch contracts for authentic activity
   app.post("/api/blockchain/monitor-gemlaunch", async (req, res) => {
     try {
@@ -394,7 +388,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to monitor Gemlaunch contracts" });
     }
   });
-
   // Get user referral stats
   app.get("/api/referrals/stats/:walletAddress", async (req, res) => {
     try {
@@ -418,7 +411,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch referral stats" });
     }
   });
-
   // Get referral leaderboard
   app.get("/api/referrals/leaderboard", async (req, res) => {
     try {
@@ -430,7 +422,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch referral leaderboard" });
     }
   });
-
   // Social media analysis endpoint
   app.post("/api/social/analyze-mention", async (req, res) => {
     try {
@@ -524,7 +515,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to analyze social mention" });
     }
   });
-
   // Get user recent referrals
   app.get("/api/referrals/recent/:walletAddress", async (req, res) => {
     try {
@@ -543,6 +533,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/accolade_collector/:walletAddress", async (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      const user = await storage.getUserByWalletAddress(walletAddress);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const accoladeExists = await storage.checkAccolade(user.id, "accolade_collector");
+      if (!accoladeExists) {
+        const hasTwentyAccolades = await storage.hasTwentyAccolades(user.id);
+        if (hasTwentyAccolades) {
+          const accolade = await insertAccolade(user, "accolade_collector");
+          res.json(accolade)
+        } else {
+          res.json({ "accolade_collector": false })
+        }
+      } else {
+        res.json({ "accolade_collector": true })
+      }
+    } catch (error) {
+      console.error("Error fetching recent referrals:", error);
+      res.status(500).json({ error: "Failed to fetch recent referrals" });
+    }
+  })
   // Profile management endpoints
   app.get("/api/profile/:walletAddress", async (req, res) => {
     try {
@@ -622,7 +636,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to remove user wallet" });
     }
   });
-
   // Admin endpoint to view all accolades
   app.get("/api/admin/accolades/all", async (req, res) => {
     try {
@@ -633,7 +646,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch accolades" });
     }
   });
-
   // Admin endpoint to fix accolades manually
   app.post("/api/admin/accolades/fix", async (req, res) => {
     try {
@@ -752,7 +764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userAccolades = await storage.getUserAccolades(user.id);
         const { ACCOLADES } = await import("@shared/accolades");
         const accoladeBonus = userAccolades.reduce((total, accolade) => {
-          const def = ACCOLADES.find((a) => a.id === accolade.accoladeType);
+          const def = ACCOLADES.find((a) => a.id?.toString() === accolade.accoladeType);
           return total + (def?.pointsBonus || 0);
         }, 0);
 
@@ -780,9 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fix accolades" });
     }
   });
-
   // Endpoint to insert accolade for user (admin or self-service)
-
   app.post("/api/users/:address/accolades", async (req, res) => {
     try {
       const { db } = await import("./db");
@@ -813,7 +823,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
   // Social campaigns endpoint (Sweep Widget integration area)
   app.get("/api/social/campaigns", async (req, res) => {
     try {
@@ -833,7 +842,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch campaigns" });
     }
   });
-
   // Connect wallet - create or get user
   app.post("/api/wallet/connect", async (req, res) => {
     try {
@@ -945,7 +953,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to connect wallet" });
     }
   });
-
   // Blockchain scanning endpoint for discovering real Gemlaunch users
   app.post("/api/admin/scan-blockchain", async (req, res) => {
     try {
@@ -981,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toBlock: currentBlock,
         users: users.slice(0, 10), // Return first 10 users for preview
       });
-    } catch (error) {
+    } catch (error:any) {
       console.error("Error scanning blockchain:", error);
       res.status(500).json({
         success: false,
@@ -990,6 +997,437 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  // Funding Veteran
+  // app.post("/api/get/user-investments", async (req, res) => {
+  //   const GRAPHQL_URL = "https://api.studio.thegraph.com/query/120543/launchpad-gempad-bsc/0.0.4";
+
+  //   const SECOND_GRAPHQL_URL = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4"
+  //   const { walletAddress } = req.body;
+  //   console.log({ walletAddress })
+
+  //   if (!walletAddress) {
+  //     return res.status(400).json({ error: "Wallet address is required" });
+  //   }
+
+  //   try {
+  //     // Step 1: Get user purchases from the first subgraph
+  //     const purchasesQuery = `
+  //   query {
+  //     purchases(where: {buyer: "${walletAddress.toLowerCase()}"}) {
+  //       timestamp
+  //       id
+  //       buyer
+  //       amount
+  //       launchpad {
+  //         token
+  //       }
+  //     }
+  //   }
+  // `;
+
+
+  //     const purchasesResponse = await fetch(GRAPHQL_URL, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         query: `
+  //       query {
+  //         purchases(where: {buyer: "${walletAddress.toLowerCase()}"}) {
+  //           id
+  //           timestamp
+  //           buyer
+  //           amount
+  //           launchpad {
+  //             token
+  //           }
+  //         }
+  //       }
+  //     `,
+  //         variables: {}
+  //       }),
+  //     });
+  //     console.log({ purchasesResponse })
+
+  //     const purchasesData = await purchasesResponse.json();
+  //     console.log("Purchases query body:", JSON.stringify({
+  //       query: purchasesQuery,
+  //       variables: { walletAddress: walletAddress.toLowerCase() },
+  //     }, null, 2));
+
+  //     console.log("Purchases response:", JSON.stringify(purchasesData, null, 2));
+
+  //     if (!purchasesData.data || !purchasesData.data.purchases) {
+  //       return res.status(200).json({
+  //         message: "No investments found for this wallet address.",
+  //         totalInvestment: "0",
+  //         investments: []
+  //       });
+  //     }
+
+  //     const purchases = purchasesData.data.purchases;
+
+  //     if (purchases.length === 0) {
+  //       return res.status(200).json({
+  //         message: "No investments found for this wallet address.",
+  //         totalInvestment: "0",
+  //         investments: []
+  //       });
+  //     }
+
+  //     // Step 2: Get unique token addresses
+  //     const uniqueTokens = [...new Set(purchases.map(purchase => purchase.launchpad.token))];
+
+  //     // Step 3: Fetch token details from the second subgraph
+  //     const tokenDetailsMap = {};
+
+  //     for (const tokenAddress of uniqueTokens) {
+  //       const tokenQuery = `
+  //           query MyQuery {
+  //             token(id: "${tokenAddress.toLowerCase()}") {
+  //               owner
+  //               decimals
+  //             }
+  //           }
+  //         `;
+
+  //       const tokenResponse = await fetch(SECOND_GRAPHQL_URL, { // Assuming you have a second subgraph URL
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({
+  //           query: tokenQuery,
+  //         }),
+  //       });
+
+  //       const tokenData = await tokenResponse.json();
+  //       console.log({ tokenData: tokenData.data })
+
+  //       if (tokenData.data && tokenData.data.token) {
+  //         tokenDetailsMap[tokenAddress] = tokenData.data.token;
+  //       } else {
+  //         // Default to 18 decimals if token not found
+  //         tokenDetailsMap[tokenAddress] = { decimals: "18", owner: null };
+  //       }
+  //     }
+
+  //     // Step 4: Calculate normalized amounts and prepare response
+  //     let totalInvestment = 0;
+  //     const investments = purchases.map(purchase:any => {
+  //       const tokenAddress = purchase.launchpad.token;
+  //       const tokenDetails = tokenDetailsMap[tokenAddress];
+  //       const decimals = parseInt(tokenDetails.decimals);
+
+  //       // Convert amount from wei to human readable format
+  //       const normalizedAmount = parseFloat(purchase.amount) / Math.pow(10, decimals);
+  //       totalInvestment += normalizedAmount;
+
+  //       return {
+  //         id: purchase.id,
+  //         timestamp: purchase.timestamp,
+  //         buyer: purchase.buyer,
+  //         tokenAddress: tokenAddress,
+  //         rawAmount: purchase.amount,
+  //         normalizedAmount: normalizedAmount.toString(),
+  //         decimals: decimals,
+  //         tokenOwner: tokenDetails.owner
+  //       };
+  //     });
+
+  //     // Create user if doesn't exist (following the pattern from other endpoints)
+  //     let user = await storage.getUserByWalletAddress(walletAddress);
+
+  //     if (!user) {
+  //       const referralCode = Math.random()
+  //         .toString(36)
+  //         .substring(2, 8)
+  //         .toUpperCase();
+  //       user = await storage.createUser({
+  //         walletAddress: walletAddress,
+  //         totalPoints: 0,
+  //         referralCode,
+  //         referredBy: null,
+  //       });
+  //     }
+
+  //     // Award accolades based on investment activity
+  //     if (investments.length >= 1) {
+  //       await insertAccolade(user, "first_investor");
+  //     }
+  //     if (investments.length >= 10) {
+  //       await insertAccolade(user, "active_investor", 10);
+  //     }
+  //     if (totalInvestment >= 1000) { // Assuming 1000 is a significant investment threshold
+  //       await insertAccolade(user, "whale_investor");
+  //     }
+
+  //     const totalBNB = totalInvestment; // you already summed this up from purchases
+  //     const totalUSDC = await convertBNBtoUSDC(totalBNB);
+  //     console.log(`Total Investment: ${totalBNB} BNB ≈ ${totalUSDC.toFixed(2)} USDC`);
+
+  //     return res.json({
+  //       walletAddress: walletAddress,
+  //       totalInvestments: investments.length,
+  //       totalInvestment: totalInvestment.toString(),
+  //       investments: investments
+  //     });
+
+  //   } catch (error) {
+  //     console.error("Error fetching user investments:", error);
+  //     return res.status(500).json({ error: "Failed to fetch user investments" });
+  //   }
+  // });
+  // FUNDING VETERAN - LAUNCH PAD
+  app.post("/api/post/funding_veteran", async (req, res) => {
+    try{
+      const {owner} = req.body;
+        // fetching launchpads
+      const launchPadsQuery = `
+        query($owner: Bytes!) {
+        launchpads(where: {owner: $owner}) {
+          token
+          softCap
+          owner
+          totalRaised
+          }
+        }
+      `;
+      const data:any = await runGraphQLQuery(LAUNCHPAD_SUBGRAPH, launchPadsQuery, {owner: owner.toLowerCase()});
+      const totalBNB = getTotalRaisedInBNB(data.data.launchpads);
+      const totalUSDC = await convertBNBtoUSDC(totalBNB);
+      const THRESHOLD = 5000;
+      if(totalUSDC >= THRESHOLD){
+        let user = await storage.getUserByWalletAddress(owner);
+        await insertAccolade(user as User, "funding_veteran")
+        res.status(200).json({status: 200, message: "If exists",data: {"funding_veteran": true, total_launchpads: data.data.launchpads.length || 0, total_volume_usdc: totalUSDC, total_volume_bnb: totalBNB  } })
+      }else{
+        res.status(200).json({status: 200, message: "If exists",data: {"funding_veteran": false, total_launchpads: data.data.launchpads.length || 0, total_volume_usdc: totalUSDC, total_volume_bnb: totalBNB} })
+      }
+    }catch(err){
+      console.log({err});
+      res.status(400).json({status: 400, message: "Something went wrong", data: null})
+    }
+  })
+  // LAUNCH MASTER
+  app.post("/api/post/launch_master", async (req, res) => {
+    const {owner} = req.body;
+    console.log({owner})
+    // fetching launchpads
+    const launchPadsQuery = `
+      query($owner: Bytes!) {
+      launchpads(where: {owner: $owner}) {
+        token
+        softCap
+        owner
+        totalRaised
+      }
+    }
+    `;
+    const data:any = await runGraphQLQuery(LAUNCHPAD_SUBGRAPH, launchPadsQuery, {owner: owner.toLowerCase()});
+    if(data?.data?.launchpads.lengh === 0){
+      res.status(200).json({status: 200, message: "If exists",data: {"launch_master": false, total_launchpads: data.data.launchpads.length || 0, successfulLaunchPads : 0 } })
+    }
+    const successfulLaunchPads = countSuccessfulLaunchpads(data.data.launchpads);
+    const user = await storage.getUserByWalletAddress(owner);
+    if(successfulLaunchPads > 1){
+      await insertAccolade(user as User, "launch_master");
+    }
+    res.status(200).json({status: 200, message: "If exists",data: {"launch_master": successfulLaunchPads > 1, total_launchpads: data.data.launchpads.length || 0, successfulLaunchPads } })
+    
+    // const totalBNB = getTotalRaisedInBNB(data.data.launchpads);
+    // const totalUSDC = await convertBNBtoUSDC(totalBNB);
+    // const THRESHOLD = 5000;
+    // if(totalUSDC >= THRESHOLD){
+    //   let user = await storage.getUserByWalletAddress(owner);
+    //   console.log({user});
+    // console.log(await insertAccolade(user, "funding_veteran"))
+    //   res.status(200).json({status: 200, message: "If exists",data: {"funding_veteran": true, total_launchpads: data.data.launchpads.length || 0, total_volume_usdc: totalUSDC, total_volume_bnb: totalBNB  } })
+  // }
+  })
+  // FIRST FUNDER 
+  const firstFunderReward = async ({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
+    if(!isGiven){
+      let given = false;
+      let query = `
+        query MyQuery($buyer: String!, $minAmount: String!) {
+          purchaseEntities(where: {buyer: $buyer, amount_gt: $minAmount}) {
+            token
+            id
+            amount
+          }
+        }
+      `;
+      const fairlaunchPurchases:any = await runGraphQLQuery(graph, query, {buyer: wallet, minAmount: "0"});
+      if(!fairlaunchPurchases.errors && fairlaunchPurchases.data && fairlaunchPurchases.data.purchaseEntities.length > 0){
+        console.log(await insertAccolade(user as User, "first_funding"));
+        await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought fairlaunch token!", points: 200});
+        given = true
+      }
+      if(!given){
+        let launchPadsQuery = `
+          query MyQuery($buyer: String!, $minAmount: String!) {
+            purchases(where: {buyer: $buyer, amount_gt: $minAmount}) {
+              id
+              amount
+            }
+          }
+        `;
+        const launchpadPurchases:any = await runGraphQLQuery(launchpadGraph, launchPadsQuery, {buyer: wallet, minAmount: "0"});
+        console.log({launchpadPurchases: launchpadPurchases.data.purchases})
+        if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases){
+          console.log(await insertAccolade(user as User, "first_funding"));
+          await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought launchpad token!", points: 200});
+          given = true
+        }
+      }
+    }    
+  }
+  const fairlaunchMaster = async({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
+    if(!isGiven){
+      const query = `
+      query MyQuery($owner: String!) {
+        fairLaunchEntities(where: { owner: $owner }) {
+          owner
+          softCap
+          token
+          purchases {
+            amount
+          }
+        }
+      }
+    `;
+      const fairlaunchs:any = await runGraphQLQuery(graph, query, {owner: wallet});
+      console.log({fairlaunchs});
+      if(fairlaunchs && fairlaunchs?.data && fairlaunchs?.data?.fairLaunchEntities){
+          const isSuccessfull = isAnyFairLaunchSuccessful(fairlaunchs?.data?.fairLaunchEntities);
+          if(isSuccessfull){
+            await insertAccolade(user as User, "launch_master");
+            await createAccoladeLog({accoladeName: "Launch Master", accoladeType: "launch_master", userId: user ? user.id : 0, description: "Successfully completed a fairlaunch project", points: 200})
+          }
+      }
+    }
+  }
+  const tokenCreatorAndSerialCreator = async ({wallet, graph, user, isGiven = false}: {wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
+    if(!isGiven){
+      const query = `
+      query MyQuery($owner: String!) {
+        tokens(where: {owner: $owner}) {
+          name
+          tokenType
+          symbol
+          owner
+          id
+        }
+      }
+    `;
+    const tokens:any = await runGraphQLQuery(graph, query, {owner: wallet});
+    console.log({tokens })
+    if (tokens && !tokens?.errors && tokens?.data?.tokens?.length !== 0) {
+      await insertAccolade(user as User, "token_creator");
+      await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points: 200 });
+      if (tokens.data.tokens.length >= 5) {
+        await insertAccolade(user as User, "serial_creator", 5);
+        // create accolade log to continue
+        await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points: 200 });     
+      }
+    }
+    }
+  };
+  const fundingVeteranHandler = async ({wallet, graph, user, isGiven = false}: {wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
+    const query = `
+      query MyQuery($owner: String!) {
+        tokens(where: {owner: $owner) {
+          name
+          tokenType
+          symbol
+          owner
+          id
+        }
+      }
+    `;
+    const data:any = await runGraphQLQuery(LAUNCHPAD_SUBGRAPH, query, {owner: wallet});
+    const totalBNB = getTotalRaisedInBNB(data.data.launchpads);
+    const totalUSDC = await convertBNBtoUSDC(totalBNB);
+    const THRESHOLD = 5000;
+    if(totalUSDC >= THRESHOLD){
+      await insertAccolade(user as User, "funding_veteran");
+      if(user){
+        await createAccoladeLog({accoladeName: "Funding Veteran", accoladeType: "funding_veteran", userId: user?.id, description: "Successfully invested 5000 USDC", points: 200})
+      }
+    }
+  }
+  // TOKENS
+  app.post("/api/get/tokens", async (req, res) => {
+    const { owner } = req.body;
+    if (!owner) {
+      sendResponse(res, 400,"Owner address is required", null); 
+    }
+    const query = `
+      query MyQuery($owner: String!) {
+        tokens(where: {owner: "${owner}"}) {
+          name
+          tokenType
+          symbol
+          owner
+          id
+        }
+      }
+    `;
+    try {
+      const response = await fetch(GRAPHQL_URL_TOKEN, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          variables: { owner },
+        }),
+      });
+      const data = await response.json();
+      if (data.data.tokens.length === 0) {
+        sendResponse(res, 200,"No token(s) found", {tokens: 0}); 
+      }
+      let user:any = await storage.getUserByWalletAddress(owner);
+      let reward = {token_creator: false, serial_creator: false};
+      if (data.data.tokens.length >= 1) {
+        await insertAccolade(user as User, "token_creator");
+        await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points: 200 })
+        reward.token_creator = true;
+      }
+      if (data.data.tokens.length >= 5) {
+        await insertAccolade(user as User, "serial_creator", 5);
+        // create accolade log to continue
+        await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points: 200 })
+        reward.serial_creator = true;
+      }
+
+      // check first funder - deposit in any token
+
+      sendResponse(res, 200,"Token fetched successfully", { tokens: data.data.tokens.length, serial_creator: reward.serial_creator, token_creator: reward.token_creator }); 
+    } catch (error) {
+      console.error(error);
+      sendResponse(res, 500,"Something went wrong", null); 
+    }
+  });
+  //AVAILBLE ACCOLADES
+  app.get("/api/available/accolades/:wallet_address", async (req, res) => {
+    try {
+      const { wallet_address } = req.params;
+      const user: User | undefined = await storage.getUserByWalletAddress(wallet_address);
+      if (!user) {
+        return sendResponse(res, 500, "Invalid wallet address found", null);
+      }
+      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
+      await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
+      await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
+      await fundingVeteranHandler({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}) 
+      const accolades = await getAllAccoladesForUser(user.id);
+      console.log(accolades.rows);
+      sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
+    } catch (err) {
+      sendResponse(res, 500, "Something went wrong", null);
+    }
+  });
+  // CREATE LOGS
+  
+
 
   const httpServer = createServer(app);
 
@@ -1059,3 +1497,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   return httpServer;
 }
+
+
+

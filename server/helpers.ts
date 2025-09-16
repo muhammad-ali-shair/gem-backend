@@ -2,7 +2,7 @@ import { Response } from "express";
 import fetch from "node-fetch";
 import { db } from "./db";
 import { accolades, accoladesHistory, gemAccolades } from "@shared/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 
 ///////////////// ---- TYPES ---- ///////////////////
@@ -41,6 +41,16 @@ import { and, eq, sql } from "drizzle-orm";
       description?: string;
       userId: number;
       points?: number;
+    };
+
+    export type Purchase = {
+      buyer: string;
+      amount: string; // BigInt-compatible string
+    };
+    
+    export type FairLaunch = {
+      softCap: string;
+      purchases: Purchase[];
     };
 /////////////////////// ------ HELPERS ----- //////////////////////
     export const runGraphQLQuery = async (url: string, query: string, variables = {}) => {
@@ -92,6 +102,16 @@ import { and, eq, sql } from "drizzle-orm";
           isGiven: userAccoladeTypes.has(acc.symbol), // match symbol ↔ accoladeType
         }));
     };
+
+    export const isAnyFairLaunchSuccessful = (fairLaunches: FairLaunch[]): boolean => {
+      return fairLaunches.some((launch) => {
+        const total = launch.purchases.reduce(
+          (sum, p) => sum + BigInt(p.amount),
+          BigInt(0)
+        );
+        return total >= BigInt(launch.softCap);
+      });
+    };
     
     /////////////////// ------ DATABASE ------- ///////////////////////
     export const getAccoladeTypesByUser = async (userId: number) => {
@@ -117,25 +137,30 @@ import { and, eq, sql } from "drizzle-orm";
 
     export const getAllAccoladesForUser = async (userId: number) => {
         try {
-            return await db.execute(sql`
-                SELECT 
-                  g.id,
-                  g.symbol,
-                  g.name,
-                  g.description,
-                  g.icon,
-                  g.category,
-                  g.level,
-                  g.criteria,
-                  g.points_bonus AS "pointsBonus",
-                  g.rarity,
-                  CASE WHEN a.id IS NOT NULL THEN true ELSE false END AS "isGiven"
-                FROM gem_accolades g
-                LEFT JOIN accolades a
-                  ON a.accolade_type = g.symbol
-                 AND a.user_id = ${userId}
-                ORDER BY g.id
-              `);
+          return await db.execute(sql`
+            SELECT 
+              g.id,
+              g.symbol,
+              g.name,
+              g.description,
+              g.icon,
+              g.category,
+              g.level,
+              g.criteria,
+              g.points_bonus AS "pointsBonus",
+              g.rarity,
+              CASE 
+                WHEN EXISTS (
+                  SELECT 1 
+                  FROM accolades a
+                  WHERE a.accolade_type = g.symbol
+                    AND a.user_id = ${userId}
+                ) THEN true 
+                ELSE false 
+              END AS "isGiven"
+            FROM gem_accolades g
+            ORDER BY g.id
+          `);          
         } catch (err) {
           console.error("Error fetching accolades with join:", err);
           throw err;
@@ -153,7 +178,38 @@ import { and, eq, sql } from "drizzle-orm";
           points: input.points ?? 0,
         })
         .returning();
-    
       return newLog;
     }
+
+    type GetUserAccoladesParams = {
+      userId: string;
+      page?: number;
+      limit?: number;
+    };
+    
+    export const getUserAccoladesHistory = async ({
+      userId,
+      page = 1,
+      limit = 10,
+    }: GetUserAccoladesParams) => {
+      const offset = (page - 1) * limit;
+     console.log({userId}) 
+      const rows = await db
+        .select({
+          id: accoladesHistory.id,
+          accoladeType: accoladesHistory.accoladeType,
+          accoladeName: accoladesHistory.accoladeName,
+          description: accoladesHistory.description,
+          userId: accoladesHistory.userId,
+          createdAt: accoladesHistory.createdAt,
+          points: accoladesHistory.points,
+        })
+        .from(accoladesHistory)
+        .where(eq(accoladesHistory.userId, userId))
+        .orderBy(desc(accoladesHistory.createdAt))
+        .limit(limit)
+        .offset(offset);
+    
+      return rows;
+    };
     ///////////////////////////////////////////////////
