@@ -311,9 +311,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   // Get current user's accolades
-  app.get("/api/user/accolades", async (req, res) => {
+  app.get("/api/user/accolades/:wallet", async (req, res) => {
     try {
-      const walletAddress = req.query.wallet as string;
+      const walletAddress = req.params.wallet as string;
+      console.log("waletttttttttttttttttttttttttttttttttttttttttttttt", walletAddress)
       if (!walletAddress) {
         return res.json([]);
       }
@@ -1634,6 +1635,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  app.get("/api/earned/accolades/:wallet_address", async(req, res) => {
+    const { wallet_address } = req.params;
+    const user:any = await storage.getUserByWalletAddress(wallet_address);
+
+  })  
   // TOKENS
   app.post("/api/get/tokens", async (req, res) => {
     const { owner } = req.body;
