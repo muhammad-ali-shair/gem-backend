@@ -9,6 +9,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "https://gemlaunch.io",
   "http://192.168.18.133:3000",
+  "https://gampad.vercel.app"
 ];
 
 app.use(
