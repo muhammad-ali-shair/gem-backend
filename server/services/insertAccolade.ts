@@ -96,72 +96,7 @@ export const insertAccolade = async (
       return { message: "Accolade(s) updated" };
     }
 
-    case "genesis_member":
-    case "gemlaunch_pioneer":
-    case "early_adopter":
-    case "user_join_rank" :  {  // user_join_rank is maked by me.
-      // if (progress?.completed) {  
-      //   return { message: `${symbol} already unlocked`, progress };
-      // }
-
-      // Fetch global rank record
-      let [record] = await db
-        .select()
-        .from(accoladeRecords)
-        .where(eq(accoladeRecords.recordType, "user_join_rank"));
-
-      if (!record) {
-        // create if missing
-        [record] = await db
-          .insert(accoladeRecords)
-          .values({ recordType: "user_join_rank", value: "0" })
-          .returning();
-      }
-
-      const currentRank =(parseInt(record.value) + 1).toString(); // next user’s placement
-
-      // Update global counter
-      await db
-        .update(accoladeRecords)
-        .set({ value: currentRank, updatedAt: new Date() })
-        .where(eq(accoladeRecords.id, record.id));
-
-      // Decide what accolades this rank gets
-      const unlocked: any[] = [];
-
-      if (parseInt(currentRank) <= 10) {
-        unlocked.push("genesis_member");
-        unlocked.push("gemlaunch_pioneer");
-        unlocked.push("early_adopter");
-      } else if (parseInt(currentRank) <= 50) {
-        unlocked.push("gemlaunch_pioneer");
-        unlocked.push("early_adopter");
-      } else if (parseInt(currentRank) <= 1000) {
-        unlocked.push("early_adopter");
-      }
-
-      if (unlocked.length === 0) {
-        return { message: "User not in first 1000, no accolade awarded" };
-      }
-
-      // Award accolades to user
-      const results = [];
-      for (const accoladeType of unlocked) {
-        results.push(
-          await storage.createAccolade({
-            userId,
-            accoladeType,
-            level: 1,
-            multiplier: accoladeDef.pointsBonus ?? 1,
-          })
-        );
-      }
-
-      return { rank: currentRank, unlocked: results };
-    }
-
-
-    
+     
     case "first_funding": {
       if (progress?.completed) {
         return { message: "First Funder already unlocked", progress };

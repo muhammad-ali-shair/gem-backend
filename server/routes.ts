@@ -10,10 +10,11 @@ import {
   insertPointConfigSchema,
   gemAccolades,
   User,
+  users,
 } from "@shared/schema";
 import { z } from "zod";
 import { socialMediaAnalyzer } from "./services/ai";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { insertAccolade } from "./services/insertAccolade";
 import { accoladeQueue } from "./queues/accoladeQueue";
 import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
@@ -668,25 +669,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const joinOrder = i + 1;
 
         // Pioneer accolades based on join order (only one)
-        if (joinOrder <= 10) {
-          await storage.createAccolade({
-            userId: user.id,
-            accoladeType: "genesis_member",
-            // name: 'Genesis Member'
-          });
-        } else if (joinOrder <= 50) {
-          await storage.createAccolade({
-            userId: user.id,
-            accoladeType: "gemlaunch_pioneer",
-            // name: 'Gemlaunch Pioneer'
-          });
-        } else if (joinOrder <= 1000) {
-          await storage.createAccolade({
-            userId: user.id,
-            accoladeType: "early_adopter",
-            // name: 'Early Adopter'
-          });
-        }
+        // if (joinOrder <= 10) {
+        //   await storage.createAccolade({
+        //     userId: user.id,
+        //     accoladeType: "genesis_member",
+        //     // name: 'Genesis Member'
+        //   });
+        // } else if (joinOrder <= 50) {
+        //   await storage.createAccolade({
+        //     userId: user.id,
+        //     accoladeType: "gemlaunch_pioneer",
+        //     // name: 'Gemlaunch Pioneer'
+        //   });
+        // } else if (joinOrder <= 1000) {
+        //   await storage.createAccolade({
+        //     userId: user.id,
+        //     accoladeType: "early_adopter",
+        //     // name: 'Early Adopter'
+        //   });
+        // }
 
         // Get user activities to determine other accolades
         const userActivities = await db
@@ -928,20 +929,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Create Gemlaunch Pioneer accolade for early users
-        await storage.createAccolade({
-          userId: user.id,
-          accoladeType: "gemlaunch_pioneer",
-          level: 1,
-          multiplier: 1.1,
-        });
 
-        await storage.updateUserPoints(user.id, 1100); // 100 + 500 + 300 + 200
+        // await storage.updateUserPoints(user.id, 1100); // 100 + 500 + 300 + 200
       }
 
-      await accoladeQueue.add("createInfluencerAccolade", {
-        user,
-        accolade: "genesis_member",
-      });
+      // await accoladeQueue.add("createInfluencerAccolade", {
+      //   user,
+      //   accolade: "genesis_member",
+      // });
 
       res.json({
         user,
@@ -1376,6 +1371,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     }
   }
+
+  // Genesis / Pioneer / Early Adopter accolades
+  const rankBasedAccolades = async ({ user, wallet }: { user: User; wallet: string }) => {
+    // Fetch user rank from DB
+    const currentRank = await getUserRank(user.id);
+    if (!currentRank) return;
+
+    // determine unlocked accolades
+    const unlocked: string[] = [];
+    if (currentRank <= 10) {
+      unlocked.push("genesis_member", "gemlaunch_pioneer", "early_adopter");
+    } else if (currentRank <= 50) {
+      unlocked.push("gemlaunch_pioneer", "early_adopter");
+    } else if (currentRank <= 1000) {
+      unlocked.push("early_adopter");
+    }
+
+    if (unlocked.length === 0) return;
+
+    // Check activity from BOTH subgraphs
+    const launchpadQuery = `
+      query ($owner: String!) {
+        launchpadCreateds(where: { launchpad: $owner }) {
+          id
+          info_token
+        }
+      }
+    `;
+    const fairlaunchQuery = `
+      query ($owner: String!) {
+        fairLaunchCreateds(where: { fairLaunch: $owner }) {
+          id
+          _info_token
+        }
+      }
+    `;
+
+    // run queries separately
+    const [launchpadRes, fairlaunchRes] = await Promise.all([
+      runGraphQLQuery(LAUNCHPAD_SUBGRAPH, launchpadQuery, { owner: wallet }),
+      runGraphQLQuery(FAIRLAUCH_SUBGRAPH, fairlaunchQuery, { owner: wallet })
+      ]);
+
+    const hasActivity =
+      (launchpadRes?.data?.launchpadCreateds?.length ?? 0) > 0 ||
+      (fairlaunchRes?.data?.fairLaunchCreateds?.length ?? 0) > 0;
+
+    if (!hasActivity) return; // don’t give accolade if no activity
+
+    // award accolades
+    for (const accoladeType of unlocked) {
+      await insertAccolade(user, accoladeType);
+      const points = await getAccoladePoints(accoladeType);
+      await createAccoladeLog({
+        accoladeName:
+          accoladeType === "genesis_member"
+            ? "Genesis Member"
+            : accoladeType === "gemlaunch_pioneer"
+            ? "Gemlaunch Pioneer"
+            : "Early Adopter",
+        accoladeType,  
+        userId: user.id,
+        description: "Awarded for being an early rank user",
+        points,
+      });
+    }
+  };
+
+  const getUserRank = async (userId: number) => {
+    const user = await db.select().from(users).orderBy(asc(users.createdAt));
+    const index = user.findIndex(u => u.id === userId);
+    return index >= 0 ? index + 1 : null;
+  };
+
    //AVAILBLE ACCOLADES
   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
@@ -1388,6 +1457,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
       await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
       await fundingVeteranHandler({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}) 
+
+      // 🔹 NEW: rank-based accolade handler
+      await rankBasedAccolades({ user, wallet: wallet_address });
+
       const accolades = await getAllAccoladesForUser(user.id);
       console.log(accolades.rows);
       sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
