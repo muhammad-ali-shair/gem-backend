@@ -1292,7 +1292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `;
         const launchpadPurchases:any = await runGraphQLQuery(launchpadGraph, launchPadsQuery, {buyer: wallet, minAmount: "0"});
         console.log({launchpadPurchases: launchpadPurchases.data.purchases})
-        if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases){
+        if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases?.length > 0){
           await insertAccoladeInAccolade(user as User, "first_funding")
           const points = await getAccoladePoints("first_funding");
           await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought launchpad token!", points});
