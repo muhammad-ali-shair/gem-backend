@@ -15,7 +15,11 @@ import {
 import { z } from "zod";
 import { socialMediaAnalyzer } from "./services/ai";
 import { asc, eq } from "drizzle-orm";
+<<<<<<< HEAD
 import { insertAccolade } from "./services/insertAccolade";
+=======
+import { insertAccolade, insertAccoladeInAccolade } from "./services/insertAccolade";
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
 import { accoladeQueue } from "./queues/accoladeQueue";
 import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
@@ -27,6 +31,8 @@ import { db } from "./db";
   const FAIRLAUCH_SUBGRAPH = "https://api.studio.thegraph.com/query/120543/fairlaunch-gempad-bsc/0.0.6";
   const TOKEN_SUBGRAPH = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4"
   const GRAPHQL_URL_TOKEN = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4";
+
+  const NEW_GEMLAUNCH_SUBGRAPH = "https://api.studio.thegraph.com/query/111026/test/gemlaunch"
 //
 
 
@@ -99,6 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to fetch tokens" });
     }
   });
+
 
   app.post("/api/get/first-funder", async (req, res) => {
     const { owner } = req.body;
@@ -308,9 +315,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   // Get current user's accolades
-  app.get("/api/user/accolades", async (req, res) => {
+  app.get("/api/user/accolades/:wallet", async (req, res) => {
     try {
-      const walletAddress = req.query.wallet as string;
+      const walletAddress = req.params.wallet as string;
+      console.log("waletttttttttttttttttttttttttttttttttttttttttttttt", walletAddress)
       if (!walletAddress) {
         return res.json([]);
       }
@@ -1266,7 +1274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `;
       const fairlaunchPurchases:any = await runGraphQLQuery(graph, query, {buyer: wallet, minAmount: "0"});
       if(!fairlaunchPurchases.errors && fairlaunchPurchases.data && fairlaunchPurchases.data.purchaseEntities.length > 0){
-        await insertAccolade(user as User, "first_funding");
+        await insertAccoladeInAccolade(user as User, "first_funding");
         const points = await getAccoladePoints("first_funding");
         await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought fairlaunch token!", points});
         given = true
@@ -1282,8 +1290,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `;
         const launchpadPurchases:any = await runGraphQLQuery(launchpadGraph, launchPadsQuery, {buyer: wallet, minAmount: "0"});
         console.log({launchpadPurchases: launchpadPurchases.data.purchases})
-        if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases){
-          await insertAccolade(user as User, "first_funding")
+        if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases?.length > 0){
+          await insertAccoladeInAccolade(user as User, "first_funding")
           const points = await getAccoladePoints("first_funding");
           await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought launchpad token!", points});
           given = true
@@ -1310,7 +1318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if(fairlaunchs && fairlaunchs?.data && fairlaunchs?.data?.fairLaunchEntities){
           const isSuccessfull = isAnyFairLaunchSuccessful(fairlaunchs?.data?.fairLaunchEntities);
           if(isSuccessfull){
-            await insertAccolade(user as User, "launch_master");
+            await insertAccoladeInAccolade(user as User, "launch_master");
             const points = await getAccoladePoints("launch_master");
             await createAccoladeLog({accoladeName: "Launch Master", accoladeType: "launch_master", userId: user ? user.id : 0, description: "Successfully completed a fairlaunch project", points})
           }
@@ -1332,11 +1340,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     `;
     const tokens:any = await runGraphQLQuery(graph, query, {owner: wallet});
     if (tokens && !tokens?.errors && tokens?.data?.tokens?.length !== 0) {
-      await insertAccolade(user as User, "token_creator");
+      await insertAccoladeInAccolade(user as User, "token_creator");
       const points = await getAccoladePoints("token_creator");
       await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points });
       if (tokens.data.tokens.length >= 5) {
-        await insertAccolade(user as User, "serial_creator", 5);
+        await insertAccoladeInAccolade(user as User, "serial_creator", 5);
         // create accolade log to continue
         const points = await getAccoladePoints("serial_creator");
         await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points });     
@@ -1362,7 +1370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalUSDC = await convertBNBtoUSDC(totalBNB);
       const THRESHOLD = 5000;
       if(totalUSDC >= THRESHOLD){
-        await insertAccolade(user as User, "funding_veteran");
+        await insertAccoladeInAccolade(user as User, "funding_veteran");
         if(user){
           const points = await getAccoladePoints("funding_veteran");
           await createAccoladeLog({accoladeName: "Funding Veteran", accoladeType: "funding_veteran", userId: user?.id, description: "Successfully invested 5000 USDC", points})
@@ -1371,13 +1379,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     }
   }
+<<<<<<< HEAD
 
+=======
+  const hasBigProject = async (data: any) => {
+    const MIN_USDC = 10000;
+  
+    // helper to convert unix timestamp to dd-mm-yyyy for coingecko
+    const formatDate = (ts: string) => {
+      const d = new Date(parseInt(ts, 10) * 1000);
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = d.getUTCFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    };
+  
+    const checkProjects = async (projects: any[]) => {
+      for (const p of projects) {
+        if (!p.totalRaisedBNB || p.totalRaisedBNB === "0") continue;
+        const date = formatDate(p.createdAt);
+        const url = `https://api.coingecko.com/api/v3/coins/binancecoin/history?date=${date}&localization=false`;
+        const res =  await fetch(url);
+        if (!res.ok) continue;
+        const json = await res.json();
+        const price = json?.market_data?.current_price?.usd;
+        if (!price) continue;
+        const raisedUSDC = parseFloat(p.totalRaisedBNB) * price;
+        if (raisedUSDC >= MIN_USDC) {
+          return true;
+        }
+      }
+      return false;
+    };
+    // check both fairlaunches and launchpads
+    if (await checkProjects(data.data.fairlaunches)) return true;
+    if (await checkProjects(data.data.launchpads)) return true;
+    return false;
+  }
+  const projectFounderHanlder = async ({wallet, graph, user, isGiven = false}: {wallet: string, graph: string, user: User |   undefined, launchpadGraph: string, isGiven: Boolean})  => {
+    if(!isGiven){
+      let query = `query UserLaunchpads($owner: String!) {
+          fairlaunches(where: { owner: $owner }) {
+            id
+            tokenDecimals
+            totalRaised
+            totalRaisedBNB
+            owner
+            createdAt
+          }
+          launchpads(where: { owner: $owner }) {
+            id
+            totalRaisedBNB
+            totalRaised
+            tokenDecimals
+            token
+            softCap
+            owner
+            fundToken
+            createdAt
+          }
+        }
+        `;
+       const projects:any = await runGraphQLQuery(NEW_GEMLAUNCH_SUBGRAPH, query, {owner: wallet});
+       if(!projects?.errors){
+         const exists = await hasBigProject(projects);
+         if(exists){
+          if(user){
+            await insertAccoladeInAccolade(user as User, "project_founder", 1);
+            const points = await getAccoladePoints("project_founder");
+            await createAccoladeLog({accoladeName: "Project Founder", accoladeType: "project_founder", userId: user.id, description: "Your project has successfully made 10000 USDC", points});
+          }
+         }
+       }else{
+        console.log({err: projects?.errors});
+       }
+    }
+  }
+  const hasWhaleFunding = async (data: any) => {
+    const MIN_USDC = 10000;
+  
+    // helper to convert unix timestamp to dd-mm-yyyy for coingecko
+    const formatDate = (ts: string) => {
+      const d = new Date(parseInt(ts, 10) * 1000);
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = d.getUTCFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    };
+  
+    let totalUSDC = 0;
+  
+    const checkInvestments = async (investments: any[]) => {
+      for (const p of investments) {
+        if (!p.fundAmountBNB || p.fundAmountBNB === "0") continue;
+        const date = formatDate(p.blockTimestamp);
+        const url = `https://api.coingecko.com/api/v3/coins/binancecoin/history?date=${date}&localization=false`;
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const json = await res.json();
+        const price = json?.market_data?.current_price?.usd;
+        if (!price) continue;
+        const investedUSDC = parseFloat(p.fundAmountBNB) * price;
+        totalUSDC += investedUSDC;
+        console.log({totalUSDC});
+        if (totalUSDC >= MIN_USDC) {
+          return true;
+        }
+      }
+      return false;
+    };
+  
+    // check both fairPurchases and purchases
+    if (await checkInvestments(data.data.fairPurchases)) return true;
+    if (await checkInvestments(data.data.purchases)) return true;
+  
+    return totalUSDC >= MIN_USDC;
+  };
+  const whaleFunderHandler = async ({
+    wallet,
+    graph,
+    user,
+    isGiven = false,
+  }: {
+    wallet: string;
+    graph: string;
+    user: User | undefined;
+    isGiven: Boolean;
+  }) => {
+    if (!isGiven) {
+      let query = `query UserPurchases($buyer: String!) {
+        fairPurchases(where: { buyer: $buyer }) {
+          buyer
+          fundAmount
+          fundAmountBNB
+          tokenAmount
+          transactionHash
+          blockNumber
+          blockTimestamp
+        }
+        purchases(where: { buyer: $buyer }) {
+          buyer
+          fundAmount
+          fundAmountBNB
+          tokenAmount
+          blockTimestamp
+          transactionHash
+          blockNumber
+        }
+      }`;
+      const purchases: any = await runGraphQLQuery(graph, query, { buyer: wallet });
+      
+      if (!purchases?.errors) {
+        const exists = await hasWhaleFunding(purchases);
+        if (exists && user) {
+          await insertAccoladeInAccolade(user as User, "whale_funder", 1);
+          const points = await getAccoladePoints("whale_funder");
+          await createAccoladeLog({
+            accoladeName: "Whale Funder",
+            accoladeType: "whale_funder",
+            userId: user.id,
+            description: "You invested 10,000+ USDC across launches",
+            points,
+          });
+        }
+      } else {
+        console.log({ err: purchases?.errors });
+      }
+    }
+  };
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
   // Genesis / Pioneer / Early Adopter accolades
   const rankBasedAccolades = async ({ user, wallet }: { user: User; wallet: string }) => {
     // Fetch user rank from DB
     const currentRank = await getUserRank(user.id);
     if (!currentRank) return;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // determine unlocked accolades
     const unlocked: string[] = [];
     if (currentRank <= 10) {
@@ -1387,9 +1566,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (currentRank <= 1000) {
       unlocked.push("early_adopter");
     }
+<<<<<<< HEAD
 
     if (unlocked.length === 0) return;
 
+=======
+    if (unlocked.length === 0) return;
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // Check activity from BOTH subgraphs
     const launchpadQuery = `
       query ($owner: String!) {
@@ -1407,11 +1590,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
     `;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // run queries separately
     const [launchpadRes, fairlaunchRes] = await Promise.all([
       runGraphQLQuery(LAUNCHPAD_SUBGRAPH, launchpadQuery, { owner: wallet }),
       runGraphQLQuery(FAIRLAUCH_SUBGRAPH, fairlaunchQuery, { owner: wallet })
+<<<<<<< HEAD
       ]);
 
     const hasActivity =
@@ -1420,6 +1607,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!hasActivity) return; // don’t give accolade if no activity
 
+=======
+    ]);
+    const hasActivity =
+      (launchpadRes?.data?.launchpadCreateds?.length ?? 0) > 0 ||
+      (fairlaunchRes?.data?.fairLaunchCreateds?.length ?? 0) > 0;
+    if (!hasActivity) return; // don’t give accolade if no activity
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // award accolades
     for (const accoladeType of unlocked) {
       await insertAccolade(user, accoladeType);
@@ -1431,21 +1625,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             : accoladeType === "gemlaunch_pioneer"
             ? "Gemlaunch Pioneer"
             : "Early Adopter",
+<<<<<<< HEAD
         accoladeType,  
+=======
+        accoladeType,
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
         userId: user.id,
         description: "Awarded for being an early rank user",
         points,
       });
     }
   };
+<<<<<<< HEAD
 
+=======
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
   const getUserRank = async (userId: number) => {
     const user = await db.select().from(users).orderBy(asc(users.createdAt));
     const index = user.findIndex(u => u.id === userId);
     return index >= 0 ? index + 1 : null;
   };
+<<<<<<< HEAD
 
    //AVAILBLE ACCOLADES
+=======
+  //AVAILBLE ACCOLADES
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
       const { wallet_address } = req.params;
@@ -1453,6 +1658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
+<<<<<<< HEAD
       await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: TOKEN_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
       await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
       await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
@@ -1461,14 +1667,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 🔹 NEW: rank-based accolade handler
       await rankBasedAccolades({ user, wallet: wallet_address });
 
+=======
+      await Promise.all([
+        tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        firstFunderReward({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        fairlaunchMaster({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        fundingVeteranHandler({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        projectFounderHanlder({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
+        rankBasedAccolades({ user, wallet: wallet_address })
+      ]);
+>>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
       const accolades = await getAllAccoladesForUser(user.id);
-      console.log(accolades.rows);
       sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
     } catch (err) {
-      console.log({err})
+      console.error({ err });
       sendResponse(res, 500, "Something went wrong", null);
     }
   });
+  
+  app.get("/api/earned/accolades/:wallet_address", async(req, res) => {
+    const { wallet_address } = req.params;
+    const user:any = await storage.getUserByWalletAddress(wallet_address);
+
+  })  
   // TOKENS
   app.post("/api/get/tokens", async (req, res) => {
     const { owner } = req.body;
@@ -1512,20 +1734,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points: 200 })
         reward.serial_creator = true;
       }
-
       // check first funder - deposit in any token
-
       sendResponse(res, 200,"Token fetched successfully", { tokens: data.data.tokens.length, serial_creator: reward.serial_creator, token_creator: reward.token_creator }); 
     } catch (error) {
       console.error(error);
       sendResponse(res, 500,"Something went wrong", null); 
     }
   });
- 
   // CREATE LOGS
-  
-
-
   const httpServer = createServer(app);
 
   // WebSocket setup for real-time updates

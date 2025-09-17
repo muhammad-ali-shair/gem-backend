@@ -355,7 +355,52 @@ export const insertAccolade = async (
       return { error: "No logic implemented for this accolade" };
   }
 };
+export const insertAccoladeInAccolade = async (
+  user: User,
+  symbol: string,
+  Current_progress: number = 0
+) => {
+  const userId = user.id;
 
+  // 1. Get accolade definition
+  const [accoladeDef] = await db
+    .select()
+    .from(gemAccolades)
+    .where(eq(gemAccolades.symbol, symbol));
+
+  if (!accoladeDef) {
+    return { error: "Accolade not found" };
+  }
+
+  // 2. Check if user already has it
+  const [existing] = await db
+    .select()
+    .from(accolades)
+    .where(
+      and(
+        eq(accolades.userId, userId),
+        eq(accolades.accoladeType, accoladeDef.symbol)
+      )
+    );
+
+  if (existing) {
+    return { message: "Already unlocked", accolade: existing };
+  }
+
+  // 3. Insert new accolade
+  const [newAccolade] = await db
+  .insert(accolades)
+  .values({
+    userId,
+    accoladeType: accoladeDef.symbol,
+    level: accoladeDef.level,
+    multiplier: accoladeDef.pointsBonus ?? 1,
+    unlockedAt: new Date().toISOString(), 
+  })
+  .returning();
+
+  return { message: "Accolade created", accolade: newAccolade };
+};
 async function grantAccolade(
   userId: number,
   accoladeDef: typeof gemAccolades.$inferSelect
