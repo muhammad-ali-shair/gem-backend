@@ -1617,20 +1617,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
-      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: TOKEN_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
-      await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
-      await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
-      await fundingVeteranHandler({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}) 
-      await projectFounderHanlder({wallet : wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});
-      await whaleFunderHandler({wallet : wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false}); 
-      await rankBasedAccolades({ user, wallet: wallet_address });
+      await Promise.all([
+        tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        firstFunderReward({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        fairlaunchMaster({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        fundingVeteranHandler({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        projectFounderHanlder({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
+        rankBasedAccolades({ user, wallet: wallet_address })
+      ]);
       const accolades = await getAllAccoladesForUser(user.id);
       sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
     } catch (err) {
-      console.log({err});
+      console.error({ err });
       sendResponse(res, 500, "Something went wrong", null);
     }
   });
+  
   // TOKENS
   app.post("/api/get/tokens", async (req, res) => {
     const { owner } = req.body;
