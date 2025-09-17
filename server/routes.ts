@@ -15,11 +15,7 @@ import {
 import { z } from "zod";
 import { socialMediaAnalyzer } from "./services/ai";
 import { asc, eq } from "drizzle-orm";
-<<<<<<< HEAD
-import { insertAccolade } from "./services/insertAccolade";
-=======
 import { insertAccolade, insertAccoladeInAccolade } from "./services/insertAccolade";
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
 import { accoladeQueue } from "./queues/accoladeQueue";
 import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
@@ -1379,9 +1375,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     }
   }
-<<<<<<< HEAD
-
-=======
   const hasBigProject = async (data: any) => {
     const MIN_USDC = 10000;
   
@@ -1547,16 +1540,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   };
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
   // Genesis / Pioneer / Early Adopter accolades
   const rankBasedAccolades = async ({ user, wallet }: { user: User; wallet: string }) => {
     // Fetch user rank from DB
     const currentRank = await getUserRank(user.id);
     if (!currentRank) return;
-<<<<<<< HEAD
-
-=======
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // determine unlocked accolades
     const unlocked: string[] = [];
     if (currentRank <= 10) {
@@ -1566,13 +1554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (currentRank <= 1000) {
       unlocked.push("early_adopter");
     }
-<<<<<<< HEAD
-
     if (unlocked.length === 0) return;
-
-=======
-    if (unlocked.length === 0) return;
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // Check activity from BOTH subgraphs
     const launchpadQuery = `
       query ($owner: String!) {
@@ -1590,30 +1572,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
     `;
-<<<<<<< HEAD
-
-=======
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // run queries separately
     const [launchpadRes, fairlaunchRes] = await Promise.all([
       runGraphQLQuery(LAUNCHPAD_SUBGRAPH, launchpadQuery, { owner: wallet }),
       runGraphQLQuery(FAIRLAUCH_SUBGRAPH, fairlaunchQuery, { owner: wallet })
-<<<<<<< HEAD
-      ]);
-
-    const hasActivity =
-      (launchpadRes?.data?.launchpadCreateds?.length ?? 0) > 0 ||
-      (fairlaunchRes?.data?.fairLaunchCreateds?.length ?? 0) > 0;
-
-    if (!hasActivity) return; // don’t give accolade if no activity
-
-=======
     ]);
     const hasActivity =
       (launchpadRes?.data?.launchpadCreateds?.length ?? 0) > 0 ||
       (fairlaunchRes?.data?.fairLaunchCreateds?.length ?? 0) > 0;
     if (!hasActivity) return; // don’t give accolade if no activity
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
     // award accolades
     for (const accoladeType of unlocked) {
       await insertAccolade(user, accoladeType);
@@ -1625,32 +1592,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             : accoladeType === "gemlaunch_pioneer"
             ? "Gemlaunch Pioneer"
             : "Early Adopter",
-<<<<<<< HEAD
-        accoladeType,  
-=======
         accoladeType,
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
         userId: user.id,
         description: "Awarded for being an early rank user",
         points,
       });
     }
   };
-<<<<<<< HEAD
-
-=======
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
   const getUserRank = async (userId: number) => {
     const user = await db.select().from(users).orderBy(asc(users.createdAt));
     const index = user.findIndex(u => u.id === userId);
     return index >= 0 ? index + 1 : null;
   };
-<<<<<<< HEAD
-
-   //AVAILBLE ACCOLADES
-=======
   //AVAILBLE ACCOLADES
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
       const { wallet_address } = req.params;
@@ -1658,16 +1612,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
-<<<<<<< HEAD
-      await tokenCreatorAndSerialCreator({wallet : wallet_address, graph: TOKEN_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}); 
-      await firstFunderReward({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user: user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});     
-      await fairlaunchMaster({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false});   
-      await fundingVeteranHandler({wallet : wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false}) 
-
-      // 🔹 NEW: rank-based accolade handler
-      await rankBasedAccolades({ user, wallet: wallet_address });
-
-=======
       await Promise.all([
         tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
         firstFunderReward({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
@@ -1677,7 +1621,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
         rankBasedAccolades({ user, wallet: wallet_address })
       ]);
->>>>>>> 12a1d75eb1b7ff909bb1381d029b9136ff62ed71
       const accolades = await getAllAccoladesForUser(user.id);
       sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
     } catch (err) {
