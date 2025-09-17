@@ -167,7 +167,33 @@ import { and, desc, eq, sql } from "drizzle-orm";
         }
     };
 
+    // export const createAccoladeLog = async (input: CreateAccoladeLogInput) => {
+    //   const [newLog] = await db
+    //     .insert(accoladesHistory)
+    //     .values({
+    //       accoladeType: input.accoladeType,
+    //       accoladeName: input.accoladeName,
+    //       description: input.description,
+    //       userId: input.userId,
+    //       points: input.points ?? 0,
+    //     })
+    //     .returning();
+    //   return newLog;
+    // }
     export const createAccoladeLog = async (input: CreateAccoladeLogInput) => {
+      const [existing] = await db
+        .select()
+        .from(accoladesHistory)
+        .where(
+          and(
+            eq(accoladesHistory.userId, input.userId),
+            eq(accoladesHistory.accoladeType, input.accoladeType)
+          )
+        )
+        .limit(1);
+      if (existing) {
+        return existing;
+      }
       const [newLog] = await db
         .insert(accoladesHistory)
         .values({
@@ -179,7 +205,8 @@ import { and, desc, eq, sql } from "drizzle-orm";
         })
         .returning();
       return newLog;
-    }
+    };
+    
 
     type GetUserAccoladesParams = {
       userId: string;
