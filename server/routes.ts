@@ -1739,12 +1739,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const givenAccolades = await getGivenAccoladesForUser(user.id);
       console.log({givenAccolades})
       await Promise.all([
-        tokenCreatorAndSerialCreator({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: givenAccolades.includes("token_creator") }),
-        firstFunderReward({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funder") }),
-        fairlaunchMaster({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("launch_master") }),
-        fundingVeteranHandler({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("funding_veteran") }),
-        projectFounderHandler({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("project_founder") }),
-        whaleFunderHandler({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("whale_funder") }),
+        tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: givenAccolades.includes("token_creator") }),
+        firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funder") }),
+        fairlaunchMaster({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("launch_master") }),
+        fundingVeteranHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("funding_veteran") }),
+        projectFounderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("project_founder") }),
+        whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("whale_funder") }),
         rankBasedAccolades({ user, wallet: wallet_address })
       ]);
       const accolades = await getAllAccoladesForUser(user.id);
