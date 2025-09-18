@@ -27,7 +27,7 @@ import { db } from "./db";
   const FAIRLAUCH_SUBGRAPH = "https://api.studio.thegraph.com/query/120543/fairlaunch-gempad-bsc/0.0.6";
   const TOKEN_SUBGRAPH = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4"
   const GRAPHQL_URL_TOKEN = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4";
-  const NEW_GEMLAUNCH_SUBGRAPH = "https://api.studio.thegraph.com/query/111026/test/private-sale"
+  const NEW_GEMLAUNCH_SUBGRAPH = "https://api.studio.thegraph.com/query/111026/test/version/latest"
 //
 
 
@@ -996,184 +996,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-  // Funding Veteran
-  // app.post("/api/get/user-investments", async (req, res) => {
-  //   const GRAPHQL_URL = "https://api.studio.thegraph.com/query/120543/launchpad-gempad-bsc/0.0.4";
-
-  //   const SECOND_GRAPHQL_URL = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4"
-  //   const { walletAddress } = req.body;
-  //   console.log({ walletAddress })
-
-  //   if (!walletAddress) {
-  //     return res.status(400).json({ error: "Wallet address is required" });
-  //   }
-
-  //   try {
-  //     // Step 1: Get user purchases from the first subgraph
-  //     const purchasesQuery = `
-  //   query {
-  //     purchases(where: {buyer: "${walletAddress.toLowerCase()}"}) {
-  //       timestamp
-  //       id
-  //       buyer
-  //       amount
-  //       launchpad {
-  //         token
-  //       }
-  //     }
-  //   }
-  // `;
-
-
-  //     const purchasesResponse = await fetch(GRAPHQL_URL, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         query: `
-  //       query {
-  //         purchases(where: {buyer: "${walletAddress.toLowerCase()}"}) {
-  //           id
-  //           timestamp
-  //           buyer
-  //           amount
-  //           launchpad {
-  //             token
-  //           }
-  //         }
-  //       }
-  //     `,
-  //         variables: {}
-  //       }),
-  //     });
-  //     console.log({ purchasesResponse })
-
-  //     const purchasesData = await purchasesResponse.json();
-  //     console.log("Purchases query body:", JSON.stringify({
-  //       query: purchasesQuery,
-  //       variables: { walletAddress: walletAddress.toLowerCase() },
-  //     }, null, 2));
-
-  //     console.log("Purchases response:", JSON.stringify(purchasesData, null, 2));
-
-  //     if (!purchasesData.data || !purchasesData.data.purchases) {
-  //       return res.status(200).json({
-  //         message: "No investments found for this wallet address.",
-  //         totalInvestment: "0",
-  //         investments: []
-  //       });
-  //     }
-
-  //     const purchases = purchasesData.data.purchases;
-
-  //     if (purchases.length === 0) {
-  //       return res.status(200).json({
-  //         message: "No investments found for this wallet address.",
-  //         totalInvestment: "0",
-  //         investments: []
-  //       });
-  //     }
-
-  //     // Step 2: Get unique token addresses
-  //     const uniqueTokens = [...new Set(purchases.map(purchase => purchase.launchpad.token))];
-
-  //     // Step 3: Fetch token details from the second subgraph
-  //     const tokenDetailsMap = {};
-
-  //     for (const tokenAddress of uniqueTokens) {
-  //       const tokenQuery = `
-  //           query MyQuery {
-  //             token(id: "${tokenAddress.toLowerCase()}") {
-  //               owner
-  //               decimals
-  //             }
-  //           }
-  //         `;
-
-  //       const tokenResponse = await fetch(SECOND_GRAPHQL_URL, { // Assuming you have a second subgraph URL
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/json" },
-  //         body: JSON.stringify({
-  //           query: tokenQuery,
-  //         }),
-  //       });
-
-  //       const tokenData = await tokenResponse.json();
-  //       console.log({ tokenData: tokenData.data })
-
-  //       if (tokenData.data && tokenData.data.token) {
-  //         tokenDetailsMap[tokenAddress] = tokenData.data.token;
-  //       } else {
-  //         // Default to 18 decimals if token not found
-  //         tokenDetailsMap[tokenAddress] = { decimals: "18", owner: null };
-  //       }
-  //     }
-
-  //     // Step 4: Calculate normalized amounts and prepare response
-  //     let totalInvestment = 0;
-  //     const investments = purchases.map(purchase:any => {
-  //       const tokenAddress = purchase.launchpad.token;
-  //       const tokenDetails = tokenDetailsMap[tokenAddress];
-  //       const decimals = parseInt(tokenDetails.decimals);
-
-  //       // Convert amount from wei to human readable format
-  //       const normalizedAmount = parseFloat(purchase.amount) / Math.pow(10, decimals);
-  //       totalInvestment += normalizedAmount;
-
-  //       return {
-  //         id: purchase.id,
-  //         timestamp: purchase.timestamp,
-  //         buyer: purchase.buyer,
-  //         tokenAddress: tokenAddress,
-  //         rawAmount: purchase.amount,
-  //         normalizedAmount: normalizedAmount.toString(),
-  //         decimals: decimals,
-  //         tokenOwner: tokenDetails.owner
-  //       };
-  //     });
-
-  //     // Create user if doesn't exist (following the pattern from other endpoints)
-  //     let user = await storage.getUserByWalletAddress(walletAddress);
-
-  //     if (!user) {
-  //       const referralCode = Math.random()
-  //         .toString(36)
-  //         .substring(2, 8)
-  //         .toUpperCase();
-  //       user = await storage.createUser({
-  //         walletAddress: walletAddress,
-  //         totalPoints: 0,
-  //         referralCode,
-  //         referredBy: null,
-  //       });
-  //     }
-
-  //     // Award accolades based on investment activity
-  //     if (investments.length >= 1) {
-  //       await insertAccolade(user, "first_investor");
-  //     }
-  //     if (investments.length >= 10) {
-  //       await insertAccolade(user, "active_investor", 10);
-  //     }
-  //     if (totalInvestment >= 1000) { // Assuming 1000 is a significant investment threshold
-  //       await insertAccolade(user, "whale_investor");
-  //     }
-
-  //     const totalBNB = totalInvestment; // you already summed this up from purchases
-  //     const totalUSDC = await convertBNBtoUSDC(totalBNB);
-  //     console.log(`Total Investment: ${totalBNB} BNB ≈ ${totalUSDC.toFixed(2)} USDC`);
-
-  //     return res.json({
-  //       walletAddress: walletAddress,
-  //       totalInvestments: investments.length,
-  //       totalInvestment: totalInvestment.toString(),
-  //       investments: investments
-  //     });
-
-  //   } catch (error) {
-  //     console.error("Error fetching user investments:", error);
-  //     return res.status(500).json({ error: "Failed to fetch user investments" });
-  //   }
-  // });
   // FUNDING VETERAN - LAUNCH PAD
   app.post("/api/post/funding_veteran", async (req, res) => {
     try{
@@ -1253,291 +1075,595 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     return 0; // fallback
   };  
-  // FIRST FUNDER - FAIRLAUNCH AND LAUNCHPAD FIRST TOKEN
-  const firstFunderReward = async ({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user : User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
-    if(!isGiven){
-      let given = false;
-      let query = `
-        query MyQuery($buyer: String!, $minAmount: String!) {
-          purchaseEntities(where: {buyer: $buyer, amount_gt: $minAmount}) {
-            token
-            id
-            amount
-          }
-        }
-      `;
-      const fairlaunchPurchases:any = await runGraphQLQuery(graph, query, {buyer: wallet, minAmount: "0"});
-      if(!fairlaunchPurchases.errors && fairlaunchPurchases.data && fairlaunchPurchases.data.purchaseEntities.length > 0){
-        await insertAccoladeInAccolade(user as User, "first_funding");
-        const points = await getAccoladePoints("first_funding");
-        await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought fairlaunch token!", points});
-        given = true
-      }
-      if(!given){
-        let launchPadsQuery = `
-          query MyQuery($buyer: String!, $minAmount: String!) {
-            purchases(where: {buyer: $buyer, amount_gt: $minAmount}) {
-              id
-              amount
-            }
-          }
-        `;
-        const launchpadPurchases:any = await runGraphQLQuery(launchpadGraph, launchPadsQuery, {buyer: wallet, minAmount: "0"});
-        console.log({launchpadPurchases: launchpadPurchases.data.purchases})
-        if(!launchpadPurchases?.errors && launchpadPurchases?.data && launchpadPurchases?.data?.purchases?.length > 0){
-          await insertAccoladeInAccolade(user as User, "first_funding")
-          const points = await getAccoladePoints("first_funding");
-          await createAccoladeLog({accoladeName: "First Funder", accoladeType: "first_funding", userId: user ? user.id : 0, description: "You bought launchpad token!", points});
-          given = true
-        }
-      }
-    }    
-  }
-  const fairlaunchMaster = async({wallet, graph, user, launchpadGraph, isGiven = false}:{wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
-    if(!isGiven){
-      const query = `
-      query MyQuery($owner: String!) {
-        fairLaunchEntities(where: { owner: $owner }) {
-          owner
-          softCap
-          token
-          purchases {
-            amount
-          }
-        }
-      }
-    `;
-      const fairlaunchs:any = await runGraphQLQuery(graph, query, {owner: wallet});
-      console.log({fairlaunchs});
-      if(fairlaunchs && fairlaunchs?.data && fairlaunchs?.data?.fairLaunchEntities){
-          const isSuccessfull = isAnyFairLaunchSuccessful(fairlaunchs?.data?.fairLaunchEntities);
-          if(isSuccessfull){
-            await insertAccoladeInAccolade(user as User, "launch_master");
-            const points = await getAccoladePoints("launch_master");
-            await createAccoladeLog({accoladeName: "Launch Master", accoladeType: "launch_master", userId: user ? user.id : 0, description: "Successfully completed a fairlaunch project", points})
-          }
-      }
-    }
-  }
-  const tokenCreatorAndSerialCreator = async ({wallet, graph, user, isGiven = false}: {wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
-    if(!isGiven){
-      const query = `
-      query MyQuery($owner: String!) {
-        tokens(where: {owner: $owner}) {
-          name
-          tokenType
-          symbol
-          owner
-          id
-        }
-      }
-    `;
-    const tokens:any = await runGraphQLQuery(graph, query, {owner: wallet});
-    if (tokens && !tokens?.errors && tokens?.data?.tokens?.length !== 0) {
-      await insertAccoladeInAccolade(user as User, "token_creator");
-      const points = await getAccoladePoints("token_creator");
-      await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points });
-      if (tokens.data.tokens.length >= 5) {
-        await insertAccoladeInAccolade(user as User, "serial_creator", 5);
-        // create accolade log to continue
-        const points = await getAccoladePoints("serial_creator");
-        await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points });     
-      }
-    }
-    }
-  };
-  const fundingVeteranHandler = async ({wallet, graph, user, isGiven = false}: {wallet: string, graph: string, user: User | undefined, launchpadGraph: string, isGiven: Boolean}) => {
-    const query = `
-      query MyQuery($owner: String!) {
-        tokens(where: {owner: $owner) {
-          name
-          tokenType
-          symbol
-          owner
-          id
-        }
-      }
-    `;
-    const data:any = await runGraphQLQuery(LAUNCHPAD_SUBGRAPH, query, {owner: wallet});
-    if(data?.data && data?.data?.launchpads?.length !== 0){
-      const totalBNB = getTotalRaisedInBNB(data.data.launchpads);
-      const totalUSDC = await convertBNBtoUSDC(totalBNB);
-      const THRESHOLD = 5000;
-      if(totalUSDC >= THRESHOLD){
-        await insertAccoladeInAccolade(user as User, "funding_veteran");
-        if(user){
-          const points = await getAccoladePoints("funding_veteran");
-          await createAccoladeLog({accoladeName: "Funding Veteran", accoladeType: "funding_veteran", userId: user?.id, description: "Successfully invested 5000 USDC", points})
-        }
-      }
-
-    }
-  }
-  const hasBigProject = async (data: any) => {
-    const MIN_USDC = 10000;
-  
-    // helper to convert unix timestamp to dd-mm-yyyy for coingecko
-    const formatDate = (ts: string) => {
-      const d = new Date(parseInt(ts, 10) * 1000);
-      const dd = String(d.getUTCDate()).padStart(2, "0");
-      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const yyyy = d.getUTCFullYear();
-      return `${dd}-${mm}-${yyyy}`;
-    };
-  
-    const checkProjects = async (projects: any[]) => {
-      for (const p of projects) {
-        if (!p.totalRaisedBNB || p.totalRaisedBNB === "0") continue;
-        const date = formatDate(p.createdAt);
-        const url = `https://api.coingecko.com/api/v3/coins/binancecoin/history?date=${date}&localization=false`;
-        const res =  await fetch(url);
-        if (!res.ok) continue;
-        const json = await res.json();
-        const price = json?.market_data?.current_price?.usd;
-        if (!price) continue;
-        const raisedUSDC = parseFloat(p.totalRaisedBNB) * price;
-        if (raisedUSDC >= MIN_USDC) {
-          return true;
-        }
-      }
-      return false;
-    };
-    // check both fairlaunches and launchpads
-    if (await checkProjects(data.data.fairlaunches)) return true;
-    if (await checkProjects(data.data.launchpads)) return true;
-    return false;
-  }
-  const projectFounderHanlder = async ({wallet, graph, user, isGiven = false}: {wallet: string, graph: string, user: User |   undefined, launchpadGraph: string, isGiven: Boolean})  => {
-    if(!isGiven){
-      let query = `query UserLaunchpads($owner: String!) {
-          fairlaunches(where: { owner: $owner }) {
-            id
-            tokenDecimals
-            totalRaised
-            totalRaisedBNB
-            owner
-            createdAt
-          }
-          launchpads(where: { owner: $owner }) {
-            id
-            totalRaisedBNB
-            totalRaised
-            tokenDecimals
-            token
-            softCap
-            owner
-            fundToken
-            createdAt
-          }
-        }
-        `;
-       const projects:any = await runGraphQLQuery(NEW_GEMLAUNCH_SUBGRAPH, query, {owner: wallet});
-       if(!projects?.errors){
-         const exists = await hasBigProject(projects);
-         if(exists){
-          if(user){
-            await insertAccoladeInAccolade(user as User, "project_founder", 1);
-            const points = await getAccoladePoints("project_founder");
-            await createAccoladeLog({accoladeName: "Project Founder", accoladeType: "project_founder", userId: user.id, description: "Your project has successfully made 10000 USDC", points});
-          }
-         }
-       }else{
-        console.log({err: projects?.errors});
-       }
-    }
-  }
-  const hasWhaleFunding = async (data: any) => {
-    const MIN_USDC = 10000;
-  
-    // helper to convert unix timestamp to dd-mm-yyyy for coingecko
-    const formatDate = (ts: string) => {
-      const d = new Date(parseInt(ts, 10) * 1000);
-      const dd = String(d.getUTCDate()).padStart(2, "0");
-      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const yyyy = d.getUTCFullYear();
-      return `${dd}-${mm}-${yyyy}`;
-    };
-  
-    let totalUSDC = 0;
-  
-    const checkInvestments = async (investments: any[]) => {
-      for (const p of investments) {
-        if (!p.fundAmountBNB || p.fundAmountBNB === "0") continue;
-        const date = formatDate(p.blockTimestamp);
-        const url = `https://api.coingecko.com/api/v3/coins/binancecoin/history?date=${date}&localization=false`;
-        const res = await fetch(url);
-        if (!res.ok) continue;
-        const json = await res.json();
-        const price = json?.market_data?.current_price?.usd;
-        if (!price) continue;
-        const investedUSDC = parseFloat(p.fundAmountBNB) * price;
-        totalUSDC += investedUSDC;
-        console.log({totalUSDC});
-        if (totalUSDC >= MIN_USDC) {
-          return true;
-        }
-      }
-      return false;
-    };
-  
-    // check both fairPurchases and purchases
-    if (await checkInvestments(data.data.fairPurchases)) return true;
-    if (await checkInvestments(data.data.purchases)) return true;
-  
-    return totalUSDC >= MIN_USDC;
-  };
-  const whaleFunderHandler = async ({
+  // FIRST FUNDER 
+  const firstFunderReward = async ({
     wallet,
     graph,
     user,
+    isGiven = false
+  }: {
+    wallet: string;
+    graph: string;
+    user: User | undefined;
+    isGiven: boolean;
+  }) => {
+    console.log(">>>>>>>>>>>>>>>>>>> firstFunderReward <<<<<<<<<<<<<<<<<<")
+    if (isGiven) {
+      console.log(`[FirstFunderReward] Skipping check because accolade already given for wallet: ${wallet}`);
+      return false;
+    }
+  
+    console.log(`[FirstFunderReward] Checking purchases for wallet: ${wallet}`);
+  
+    let given = false;
+  
+    const query = `
+      query MyQuery($buyer: String!) {
+        dutchPurchases(where: {buyer: $buyer}) {
+          fundAmountBNB
+        }
+        fairPurchases(where: {buyer: $buyer}) {
+          fundAmountBNB
+        }
+        privatePurchases(where: {buyer: $buyer}) {
+          fundAmountBNB
+        }
+        subscriptionPurchases(where: {buyer: $buyer}) {
+          fundAmountBNB
+        }
+        purchases(where: {buyer: $buyer}) {
+          fundAmountBNB
+        }
+      }
+    `;
+  
+    const res: any = await runGraphQLQuery(graph, query, { buyer: wallet });
+  
+    if (!res?.errors && res?.data) {
+      console.log(`[FirstFunderReward] GraphQL query successful for wallet: ${wallet}`);
+  
+      // collect all arrays safely
+      const allPurchases = [
+        ...(res.data?.dutchPurchases ?? []),
+        ...(res.data?.fairPurchases ?? []),
+        ...(res.data?.privatePurchases ?? []),
+        ...(res.data?.subscriptionPurchases ?? []),
+        ...(res.data?.purchases ?? [])
+      ];
+  
+      console.log(`[FirstFunderReward] Total purchases fetched: ${allPurchases.length}`);
+  
+      if (allPurchases.length === 0) {
+        console.log(`[FirstFunderReward] No purchases found for wallet: ${wallet}`);
+        return false;
+      }
+  
+      // check if any purchase has > 0 amount
+      const hasFunded = allPurchases.some((p: any, idx: number) => {
+        const amount = parseFloat(p?.fundAmountBNB ?? "0");
+        console.log(`   ↳ Purchase[${idx}] fundAmountBNB = ${amount}`);
+        return amount > 0;
+      });
+  
+      if (hasFunded) {
+        console.log(`[FirstFunderReward] ✅ Wallet ${wallet} has funded! Awarding accolade...`);
+        await insertAccoladeInAccolade(user as User, "first_funding");
+        const points = await getAccoladePoints("first_funding");
+        await createAccoladeLog({
+          accoladeName: "First Funder",
+          accoladeType: "first_funding",
+          userId: user ? user.id : 0,
+          description: "You bought tokens in a launchpad!",
+          points
+        });
+        given = true;
+        console.log(`[FirstFunderReward] 🎉 Accolade awarded: First Funder (${points} points)`);
+      } else {
+        console.log(`[FirstFunderReward] ❌ Wallet ${wallet} has purchases but all are 0 BNB`);
+      }
+    } else {
+      console.error(`[FirstFunderReward] GraphQL query failed for wallet: ${wallet}`, res?.errors);
+    }
+  
+    return given;
+  };
+  const fairlaunchMaster = async ({
+    wallet,
+    graph,
+    user,
+    isGiven = false
+  }: {
+    wallet: string;
+    graph: string;
+    user: User | undefined;
+    isGiven: boolean;
+  }) => {
+    console.log(">>>>>>>>>>>>>>>>>>> fairlaunchMaster <<<<<<<<<<<<<<<<<<")
+    if (isGiven) {
+      console.log(`[FairlaunchMaster] Skipping, accolade already given for wallet: ${wallet}`);
+      return false;
+    }
+  
+    const query = `
+      query MyQuery($owner: String!) {
+        fairlaunches(where: { owner: $owner }) {
+          fundToken
+          softCap
+          purchases {
+            fundAmountBNB
+            fundAmount
+            buyer
+          }
+          totalRaised
+          tokenDecimals
+          fundTokenDecimals
+        }
+      }
+    `;
+  
+    const res: any = await runGraphQLQuery(graph, query, { owner: wallet });
+    
+    if (!res?.errors && res?.data?.fairlaunches) {
+      console.log(`[FairlaunchMaster] Found ${res.data.fairlaunches.length} fairlaunches for wallet: ${wallet}`);
+  
+      const isSuccessful = res.data.fairlaunches.some((fl: any, idx: number) => {
+        const softCap = parseFloat(fl?.softCap ?? "0");
+        const totalRaised = parseFloat(fl?.totalRaised ?? "0");
+  
+        console.log(
+          `   ↳ Fairlaunch[${idx}] token=${fl.fundToken}, softCap=${softCap}, totalRaised=${totalRaised}`
+        );
+  
+        if (fl?.purchases?.length) {
+          fl.purchases.forEach((p: any, i: number) => {
+            console.log(
+              `       Purchase[${i}] buyer=${p.buyer}, fundAmountBNB=${p.fundAmountBNB}, fundAmount=${p.fundAmount}`
+            );
+          });
+        } else {
+          console.log(`       No purchases for this fairlaunch`);
+        }
+  
+        return totalRaised >= softCap && softCap > 0;
+      });
+  
+      if (isSuccessful) {
+        console.log(`[FairlaunchMaster] ✅ Successful fairlaunch detected → awarding accolade`);
+        await insertAccoladeInAccolade(user as User, "launch_master");
+        const points = await getAccoladePoints("launch_master");
+        await createAccoladeLog({
+          accoladeName: "Launch Master",
+          accoladeType: "launch_master",
+          userId: user ? user.id : 0,
+          description: "Successfully completed a fairlaunch project",
+          points
+        });
+        return true;
+      } else {
+        console.log(`[FairlaunchMaster] ❌ No successful fairlaunch found for wallet: ${wallet}`);
+      }
+    } else {
+      console.error(`[FairlaunchMaster] GraphQL query failed for wallet: ${wallet}`, res?.errors);
+    }
+  
+    return false;
+  };
+  const tokenCreatorAndSerialCreator = async ({
+    wallet,
+    graph,
+    user,
+    isGiven = false
+  }: {
+    wallet: string;
+    graph: string;
+    user: User | undefined;
+    launchpadGraph: string;
+    isGiven: Boolean;
+  }) => {
+    console.log(">>>>>>>>>>>>>>>>>>> tokenCreatorAndSerialCreator START <<<<<<<<<<<<<<<<<<");
+    console.log(`[TokenCreator] wallet=${wallet}, isGiven=${isGiven}`);
+  
+    if (!isGiven) {
+      const query = `
+        query MyQuery($owner: String!) {
+          tokens(where: {owner: $owner}) {
+            name
+            tokenType
+            symbol
+            owner
+            id
+          }
+        }
+      `;
+  
+      console.log("[TokenCreator] Running GraphQL query...");
+      const tokens: any = await runGraphQLQuery(graph, query, { owner: wallet });
+  
+      if (!tokens) {
+        console.log("[TokenCreator] ❌ No response from subgraph");
+        return;
+      }
+  
+      if (tokens?.errors) {
+        console.error("[TokenCreator] ❌ GraphQL errors:", tokens.errors);
+        return;
+      }
+  
+      const tokenCount = tokens?.data?.tokens?.length || 0;
+      console.log(`[TokenCreator] Found ${tokenCount} tokens for wallet=${wallet}`);
+  
+      if (tokenCount !== 0) {
+        console.log("[TokenCreator] ✅ Eligible for Token Creator accolade");
+        await insertAccoladeInAccolade(user as User, "token_creator");
+        const points = await getAccoladePoints("token_creator");
+        console.log(`[TokenCreator] Logging Token Creator accolade with ${points} points`);
+        await createAccoladeLog({
+          accoladeName: "Token Creator",
+          accoladeType: "token_creator",
+          userId: user?.id as number,
+          description: "Successfully created your first token",
+          points
+        });
+  
+        if (tokenCount >= 5) {
+          console.log("[SerialCreator] ✅ Eligible for Serial Creator accolade");
+          await insertAccoladeInAccolade(user as User, "serial_creator", 5);
+          const points = await getAccoladePoints("serial_creator");
+          console.log(`[SerialCreator] Logging Serial Creator accolade with ${points} points`);
+          await createAccoladeLog({
+            accoladeName: "Serial Creator",
+            accoladeType: "serial_creator",
+            userId: user?.id as number,
+            description: "Successfully launched 5+ tokens!",
+            points
+          });
+        } else {
+          console.log(`[SerialCreator] ❌ Not eligible (only ${tokenCount}/5 tokens)`);
+        }
+      } else {
+        console.log("[TokenCreator] ❌ Not eligible — no tokens found");
+      }
+    } else {
+      console.log("[TokenCreator] Skipping — accolade already given");
+    }
+  
+    console.log(">>>>>>>>>>>>>>>>>>> tokenCreatorAndSerialCreator END <<<<<<<<<<<<<<<<<<");
+  };
+  
+  const fundingVeteranHandler = async ({
+    wallet,
+    graph,
+    user,
+    requireMultipleLaunches = false, 
     isGiven = false,
+    thresholdUSDC = 5000 
+  }: {
+    wallet: string;
+    graph: string;
+    user: User | undefined;
+    requireMultipleLaunches?: boolean;
+    isGiven: boolean;
+    thresholdUSDC?: number;
+  }) => {
+    console.log(">>>>>>>>>>>>>>>>>>> fundingVeteranHandler <<<<<<<<<<<<<<<<<<")
+    if (isGiven) {
+      console.log(`[FundingVeteran] Skipping, accolade already given for wallet: ${wallet}`);
+      return false;
+    }
+  
+    const query = `
+      query MyQuery($buyer: String!) {
+        dutchPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        fairPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        privatePurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        subscriptionPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        purchases(where: {buyer: $buyer}) { fundAmountBNB }
+      }
+    `;
+  
+    const res: any = await runGraphQLQuery(graph, query, { buyer: wallet });
+  
+    if (!res?.errors && res?.data) {
+      const { dutchPurchases, fairPurchases, privatePurchases, subscriptionPurchases, purchases } = res.data;
+  
+      console.log(`[FundingVeteran] Purchases fetched for wallet=${wallet}`, {
+        dutch: dutchPurchases?.length,
+        fair: fairPurchases?.length,
+        private: privatePurchases?.length,
+        subscription: subscriptionPurchases?.length,
+        normal: purchases?.length
+      });
+  
+      // Flatten all purchases into one array
+      const allPurchases = [
+        ...(dutchPurchases || []),
+        ...(fairPurchases || []),
+        ...(privatePurchases || []),
+        ...(subscriptionPurchases || []),
+        ...(purchases || [])
+      ];
+  
+      // Sum total BNB
+      const totalBNB = allPurchases.reduce((acc: number, p: any) => {
+        const amt = parseFloat(p?.fundAmountBNB ?? "0");
+        return acc + amt;
+      }, 0);
+  
+      // Convert to USDC
+      const totalUSDC = await convertBNBtoUSDC(totalBNB);
+  
+      // Count unique sale types where user contributed >0
+      const categoriesContributed = [
+        dutchPurchases,
+        fairPurchases,
+        privatePurchases,
+        subscriptionPurchases,
+        purchases
+      ].filter(arr => (arr || []).some((p: any) => parseFloat(p.fundAmountBNB) > 0)).length;
+  
+      console.log(`[FundingVeteran] Total contributed=${totalBNB} BNB ≈ ${totalUSDC.toFixed(2)} USDC across ${categoriesContributed} categories`);
+  
+      const meetsThreshold = totalUSDC >= thresholdUSDC;
+      let eligible = false;
+  
+      if (requireMultipleLaunches) {
+        // strict rule: threshold AND more than 1 category
+        eligible = meetsThreshold && categoriesContributed > 1;
+        console.log(`[FundingVeteran] Mode: STRICT → eligible=${eligible}`);
+      } else {
+        // lenient rule: just threshold
+        eligible = meetsThreshold;
+        console.log(`[FundingVeteran] Mode: LENIENT → eligible=${eligible}`);
+      }
+  
+      if (eligible) {
+        console.log(`[FundingVeteran] ✅ Awarding Funding Veteran to wallet=${wallet}`);
+        await insertAccoladeInAccolade(user as User, "funding_veteran");
+        if (user) {
+          const points = await getAccoladePoints("funding_veteran");
+          await createAccoladeLog({
+            accoladeName: "Funding Veteran",
+            accoladeType: "funding_veteran",
+            userId: user.id,
+            description: `Invested ${thresholdUSDC}+ USDC across launches`,
+            points
+          });
+        }
+        return true;
+      } else {
+        console.log(`[FundingVeteran] ❌ Not eligible (totalUSDC=${totalUSDC}, categories=${categoriesContributed})`);
+      }
+    } else {
+      console.error(`[FundingVeteran] GraphQL query failed for ${wallet}`, res?.errors);
+    }
+  
+    return false;
+  };
+  const hasBigProject = async (projects: any[]) => {
+    const MIN_USDC = 10000;
+  
+    // Format unix timestamp to dd-mm-yyyy for CoinGecko
+    const formatDate = (ts: string) => {
+      const d = new Date(parseInt(ts, 10) * 1000);
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = d.getUTCFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    };
+  
+    for (const p of projects) {
+      if (!p.totalRaisedBNB || p.totalRaisedBNB === "0") {
+        console.log(`[ProjectFounder] Skipping project=${p.id}, no funds raised`);
+        continue;
+      }
+  
+      const date = formatDate(p.createdAt);
+      const url = `https://api.coingecko.com/api/v3/coins/binancecoin/history?date=${date}&localization=false`;
+      const res = await fetch(url);
+  
+      if (!res.ok) {
+        console.warn(`[ProjectFounder] Failed to fetch price for date=${date}, project=${p.id}`);
+        continue;
+      }
+  
+      const json = await res.json();
+      const price = json?.market_data?.current_price?.usd;
+      if (!price) {
+        console.warn(`[ProjectFounder] No price data for date=${date}, project=${p.id}`);
+        continue;
+      }
+  
+      const raisedUSDC = parseFloat(p.totalRaisedBNB) * price;
+      console.log(`[ProjectFounder] Project=${p.id} raised ${p.totalRaisedBNB} BNB ≈ ${raisedUSDC.toFixed(2)} USDC`);
+  
+      if (raisedUSDC >= MIN_USDC) {
+        console.log(`[ProjectFounder] ✅ Project=${p.id} qualifies (≥ ${MIN_USDC} USDC)`);
+        return true;
+      }
+    }
+  
+    return false;
+  };
+  const projectFounderHandler = async ({
+    wallet,
+    graph,
+    user,
+    isGiven = false
   }: {
     wallet: string;
     graph: string;
     user: User | undefined;
     isGiven: Boolean;
   }) => {
-    if (!isGiven) {
-      let query = `query UserPurchases($buyer: String!) {
-        fairPurchases(where: { buyer: $buyer }) {
-          buyer
-          fundAmount
-          fundAmountBNB
-          tokenAmount
-          transactionHash
-          blockNumber
-          blockTimestamp
-        }
-        purchases(where: { buyer: $buyer }) {
-          buyer
-          fundAmount
-          fundAmountBNB
-          tokenAmount
-          blockTimestamp
-          transactionHash
-          blockNumber
-        }
-      }`;
-      const purchases: any = await runGraphQLQuery(graph, query, { buyer: wallet });
-      
-      if (!purchases?.errors) {
-        const exists = await hasWhaleFunding(purchases);
-        if (exists && user) {
-          await insertAccoladeInAccolade(user as User, "whale_funder", 1);
-          const points = await getAccoladePoints("whale_funder");
-          await createAccoladeLog({
-            accoladeName: "Whale Funder",
-            accoladeType: "whale_funder",
-            userId: user.id,
-            description: "You invested 10,000+ USDC across launches",
-            points,
-          });
-        }
-      } else {
-        console.log({ err: purchases?.errors });
-      }
+    console.log(">>>>>>>>>>>>>>>>>>> projectFounderHandler <<<<<<<<<<<<<<<<<<")
+    if (isGiven) {
+      console.log(`[ProjectFounder] Skipping, accolade already given for wallet=${wallet}`);
+      return false;
     }
+  
+    const query = `
+      query MyQuery($owner: String!) {
+        dutchAuctions(where: { owner: $owner }) {
+          id
+          totalRaisedBNB
+          createdAt
+        }
+        fairlaunches(where: { owner: $owner }) {
+          id
+          totalRaisedBNB
+          createdAt
+        }
+        launchpads(where: { owner: $owner }) {
+          id
+          totalRaisedBNB
+          createdAt
+        }
+        privateSales(where: { owner: $owner }) {
+          id
+          totalRaisedBNB
+          createdAt
+        }
+        subscriptionPools(where: { owner: $owner }) {
+          id
+          totalRaisedBNB
+          createdAt
+        }
+      }
+    `;
+  
+    const res: any = await runGraphQLQuery(graph, query, { owner: wallet });
+  
+    if (res?.errors) {
+      console.error(`[ProjectFounder] GraphQL errors for wallet=${wallet}`, res.errors);
+      return false;
+    }
+  
+    const {
+      dutchAuctions = [],
+      fairlaunches = [],
+      launchpads = [],
+      privateSales = [],
+      subscriptionPools = []
+    } = res?.data || {};
+  
+    console.log(`[ProjectFounder] Checking projects for wallet=${wallet}`, {
+      dutch: dutchAuctions.length,
+      fair: fairlaunches.length,
+      launch: launchpads.length,
+      private: privateSales.length,
+      subs: subscriptionPools.length
+    });
+  
+    // Combine all project types
+    const allProjects = [
+      ...dutchAuctions,
+      ...fairlaunches,
+      ...launchpads,
+      ...privateSales,
+      ...subscriptionPools
+    ];
+  
+    const exists = await hasBigProject(allProjects);
+  
+    if (exists && user) {
+      console.log(`[ProjectFounder] Awarding Project Founder to wallet=${wallet}`);
+      await insertAccoladeInAccolade(user, "project_founder");
+      const points = await getAccoladePoints("project_founder");
+      await createAccoladeLog({
+        accoladeName: "Project Founder",
+        accoladeType: "project_founder",
+        userId: user.id,
+        description: "Your project successfully raised 10,000+ USDC",
+        points
+      });
+      return true;
+    }
+  
+    console.log(`[ProjectFounder] ❌ Not eligible for Project Founder, wallet=${wallet}`);
+    return false;
+  };  
+  const hasWhaleFunding = async (data: any) => {
+    const MIN_USDC = 10000;
+  
+    // Sum total BNB from all purchase types
+    const allPurchases = [
+      ...(data?.data?.dutchPurchases || []),
+      ...(data?.data?.fairPurchases || []),
+      ...(data?.data?.privatePurchases || []),
+      ...(data?.data?.subscriptionPurchases || []),
+      ...(data?.data?.purchases || [])
+    ];
+  
+    const totalBNB = allPurchases.reduce((acc: number, p: any) => {
+      const amt = parseFloat(p?.fundAmountBNB ?? "0");
+      return acc + amt;
+    }, 0);
+  
+    console.log(`[WhaleFunder] Total contributed = ${totalBNB} BNB`);
+  
+    // Convert to USDC using current price
+    const totalUSDC = await convertBNBtoUSDC(totalBNB);
+    console.log(`[WhaleFunder] Converted total = ${totalUSDC.toFixed(2)} USDC`);
+  
+    return totalUSDC >= MIN_USDC;
   };
+  
+  const whaleFunderHandler = async ({
+    wallet,
+    graph,
+    user,
+    isGiven = false,
+    thresholdUSDC = 10000
+  }: {
+    wallet: string;
+    graph: string;
+    user: User | undefined;
+    isGiven: Boolean;
+    thresholdUSDC?: number;
+  }) => {
+    console.log(">>>>>>>>>>>>>>>>>>> whaleFunderHandler <<<<<<<<<<<<<<<<<<")
+    if (isGiven) {
+      console.log(`[WhaleFunder] Skipping, accolade already given for wallet=${wallet}`);
+      return false;
+    }
+  
+    const query = `
+      query MyQuery($buyer: String!) {
+        dutchPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        fairPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        privatePurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        subscriptionPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+        purchases(where: {buyer: $buyer}) { fundAmountBNB }
+      }
+    `;
+  
+    const res: any = await runGraphQLQuery(graph, query, { buyer: wallet });
+  
+    if (res?.errors) {
+      console.error(`[WhaleFunder] GraphQL query failed for wallet=${wallet}`, res.errors);
+      return false;
+    }
+  
+    const exists = await hasWhaleFunding(res);
+  
+    if (exists && user) {
+      console.log(`[WhaleFunder] ✅ Awarding Whale Funder to wallet=${wallet}`);
+      await insertAccoladeInAccolade(user, "whale_funder");
+      const points = await getAccoladePoints("whale_funder");
+      await createAccoladeLog({
+        accoladeName: "Whale Funder",
+        accoladeType: "whale_funder",
+        userId: user.id,
+        description: `You invested ${thresholdUSDC}+ USDC across launches`,
+        points
+      });
+      return true;
+    }
+  
+    console.log(`[WhaleFunder] ❌ Not eligible, wallet=${wallet}`);
+    return false;
+  };
+  
   // Genesis / Pioneer / Early Adopter accolades
   const rankBasedAccolades = async ({ user, wallet }: { user: User; wallet: string }) => {
     // Fetch user rank from DB
@@ -1571,7 +1697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     `;
     // run queries separately
-    const [launchpadRes, fairlaunchRes] = await Promise.all([
+    const [launchpadRes, fairlaunchRes]: any[] = await Promise.all([
       runGraphQLQuery(LAUNCHPAD_SUBGRAPH, launchpadQuery, { owner: wallet }),
       runGraphQLQuery(FAIRLAUCH_SUBGRAPH, fairlaunchQuery, { owner: wallet })
     ]);
@@ -1612,10 +1738,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await Promise.all([
         tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
-        firstFunderReward({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
-        fairlaunchMaster({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
-        fundingVeteranHandler({ wallet: wallet_address, graph: FAIRLAUCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
-        projectFounderHanlder({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
+        firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
+        fairlaunchMaster({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
+        fundingVeteranHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
+        projectFounderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
         whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
         rankBasedAccolades({ user, wallet: wallet_address })
       ]);
