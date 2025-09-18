@@ -1740,7 +1740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log({givenAccolades})
       await Promise.all([
         tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: givenAccolades.includes("token_creator") }),
-        firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funder") }),
+        firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funding") }),
         fairlaunchMaster({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("launch_master") }),
         fundingVeteranHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("funding_veteran") }),
         projectFounderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("project_founder") }),

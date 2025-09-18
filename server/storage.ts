@@ -137,7 +137,7 @@ export class DatabaseStorage implements IStorage {
         updatedAt: users.updatedAt,
         isMainAccount: users.isMainAccount,
         parentUserId: users.parentUserId
-      })
+      }) 
       .from(users);
 
     // Filter to only main accounts and consolidate points from connected wallets
