@@ -335,7 +335,7 @@ export const insertAccolade = async (
       });
 
       // If threshold reached → award accolade
-      if (newProgress >= 20 && !progress?.completed) {
+      if (newProgress >= 20 && !progress?.completed) { 
         return await storage.createAccolade({
           userId,
           accoladeType: accoladeDef.symbol,

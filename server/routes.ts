@@ -891,46 +891,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error("Failed to create referral record:", err);
             });
           // creating the Influencer Accolade.
-          // insertAccolade( Refferr , 'Influencer' );
+          insertAccolade( Refferr , 'influencer' );
           // 🔥 Push to BullMQ queue
-          await accoladeQueue.add("createInfluencerAccolade", {
-            Refferr,
-            accolade: "Influencer",
-          });
+          // await accoladeQueue.add("createInfluencerAccolade", {
+          //   Refferr,
+          //   accolade: "Influencer",
+          // });
         }
 
         // Give welcome bonus points
-        await storage.createActivity({
-          userId: user.id,
-          activityType: "welcome_bonus",
-          points: 100,
-          metadata: JSON.stringify({ reason: "Welcome to GemLaunch!" }),
-        });
+        // await storage.createActivity({
+        //   userId: user.id,
+        //   activityType: "welcome_bonus",
+        //   points: 100,
+        //   metadata: JSON.stringify({ reason: "Welcome to GemLaunch!" }),
+        // });
 
-        // Add sample activities for demo
-        await storage.createActivity({
-          userId: user.id,
-          activityType: "token_creation",
-          points: 500,
-          metadata: JSON.stringify({ tokenName: "DEMO", tokenSymbol: "DMO" }),
-        });
+        // // Add sample activities for demo
+        // await storage.createActivity({
+        //   userId: user.id,
+        //   activityType: "token_creation",
+        //   points: 500,
+        //   metadata: JSON.stringify({ tokenName: "DEMO", tokenSymbol: "DMO" }),
+        // });
 
-        await storage.createActivity({
-          userId: user.id,
-          activityType: "project_funding",
-          points: 300,
-          metadata: JSON.stringify({
-            amount: "0.5 BNB",
-            project: "DeFi Protocol",
-          }),
-        });
+        // await storage.createActivity({
+        //   userId: user.id,
+        //   activityType: "project_funding",
+        //   points: 300,
+        //   metadata: JSON.stringify({
+        //     amount: "0.5 BNB",
+        //     project: "DeFi Protocol",
+        //   }),
+        // });
 
-        await storage.createActivity({
-          userId: user.id,
-          activityType: "referral_bonus",
-          points: 200,
-          metadata: JSON.stringify({ referredUser: "0x1234...5678" }),
-        });
+        // await storage.createActivity({
+        //   userId: user.id,
+        //   activityType: "referral_bonus",
+        //   points: 200,
+        //   metadata: JSON.stringify({ referredUser: "0x1234...5678" }),
+        // });
 
         // Create Gemlaunch Pioneer accolade for early users
 
