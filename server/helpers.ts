@@ -76,12 +76,29 @@ import { and, desc, eq, sql } from "drizzle-orm";
     };
 
     export const convertBNBtoUSDC = async (totalBNB: number) => {
+      try {
         const url = "https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd";
         const response = await fetch(url);
-        const data:any = await response.json();
+    
+        if (!response.ok) {
+          throw new Error(`Failed to fetch price: ${response.status} ${response.statusText}`);
+        }
+    
+        const data: any = await response.json();
+    
+        if (!data?.binancecoin?.usd) {
+          console.error("Unexpected response from CoinGecko:", data);
+          throw new Error("BNB price not available");
+        }
+    
         const bnbPrice = data.binancecoin.usd;
-        return totalBNB * bnbPrice; 
+        return totalBNB * bnbPrice;
+      } catch (err) {
+        console.error("convertBNBtoUSDC error:", err);
+        return 0; // or throw err if you want to stop execution
+      }
     };
+    
 
     export const countSuccessfulLaunchpads = (launchpads:LAUNCHPAD[]) => {
         return launchpads.filter(lp => BigInt(lp.totalRaised) >= BigInt(lp.softCap)).length;
@@ -134,6 +151,23 @@ import { and, desc, eq, sql } from "drizzle-orm";
           throw err;
         }
     }
+
+    export const getGivenAccoladesForUser = async (userId: number) => {
+      try {
+        const result = await db.execute(sql`
+          SELECT accolade_type
+          FROM accolades
+          WHERE user_id = ${userId}
+        `);
+    
+        // Flatten to array of strings
+        return result.rows.map((row: any) => row.accolade_type);
+      } catch (err) {
+        console.error("Error fetching given accolades:", err);
+        throw err;
+      }
+    };
+    
 
     export const getAllAccoladesForUser = async (userId: number) => {
         try {
