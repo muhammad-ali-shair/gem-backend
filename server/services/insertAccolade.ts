@@ -260,60 +260,14 @@ export const insertAccolade = async (
       };
     }
 
-    case "consistent_user": {
-      if (progress?.completed) {
-        return { message: "Already unlocked", progress: progress.progress };
-      }
-
-      const today = new Date();
-      const lastUpdated = progress?.updatedAt
-        ? new Date(progress.updatedAt)
-        : null;
-
-      let newProgress = progress?.progress ?? 0;
-
-      if (!lastUpdated) {
-        // First ever visit → start streak
-        newProgress = 1;
-      } else {
-        const diffDays = Math.floor(
-          (today.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        if (diffDays === 1) {
-          // Consecutive day → increase streak
-          newProgress += 1;
-        } else if (diffDays > 1) {
-          // Missed a day → reset streak
-          newProgress = 1;
-        }
-        // if diffDays === 0 → same day visit, don’t increment
-      }
-
-      // Update progress in DB
-      await storage.updateAccoladeProgress({
+    case "consistent_user": { 
+       return handleStreakAccolade({
         userId,
-        accoladeId: accoladeDef.id,
-        progress: newProgress,
+        accoladeDef,
+        progress,
         target: 30,
-        completed: newProgress >= 30,
+        label: "Consistent User",
       });
-
-      // If threshold reached → award accolade
-      if (newProgress >= 30 && !progress?.completed) {
-        return await storage.createAccolade({
-          userId,
-          accoladeType: accoladeDef.symbol,
-          level: accoladeDef.level,
-          multiplier: accoladeDef.pointsBonus ?? 1,
-        });
-      }
-
-      return {
-        message: "Keep visiting daily",
-        progress: newProgress,
-        target: 30,
-      };
     }
 
     case "influencer": { 
