@@ -1672,7 +1672,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // determine unlocked accolades
     const unlocked: string[] = [];
     if (currentRank <= 10) {
-      unlocked.push("genesis_member", "early_adopter");
+      unlocked.push("genesis_member", "gemlaunch_pioneer", "early_adopter");
+    } else if (currentRank <= 50) {
+      unlocked.push("gemlaunch_pioneer", "early_adopter");
     } else if (currentRank <= 1000) {
       unlocked.push("early_adopter");
     }

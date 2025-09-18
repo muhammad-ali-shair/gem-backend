@@ -101,36 +101,6 @@ export class DatabaseStorage implements IStorage {
         referralCode: this.generateReferralCode(),
       })
       .returning();
-
-    // Check if this is one of the first 50 users and award Gemlaunch Pioneer accolade
-    const userCountResult = await db.select({ count: count() }).from(users);
-    const totalUsers = userCountResult[0].count;
-    
-    if (totalUsers <= 50) {
-      // Create Gemlaunch Pioneer accolade
-      try {
-        await this.createAccolade({
-          userId: user.id,
-          accoladeType: 'gemlaunch_pioneer',
-          level: 1,
-          multiplier: 1.10
-        });
-
-        // Create activity for receiving the accolade
-        await this.createActivity({
-          userId: user.id,
-          activityType: 'accolade_earned',
-          points: 100,
-          metadata: JSON.stringify({ 
-            accoladeType: 'gemlaunch_pioneer', 
-            description: 'Earned Gemlaunch Pioneer status as one of the first 50 users!' 
-          })
-        });
-      } catch (error) {
-        console.error('Error creating Gemlaunch Pioneer accolade:', error);
-      }
-    }
-
     return user;
   }
 
