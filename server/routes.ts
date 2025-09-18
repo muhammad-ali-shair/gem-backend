@@ -27,13 +27,11 @@ import { db } from "./db";
   const FAIRLAUCH_SUBGRAPH = "https://api.studio.thegraph.com/query/120543/fairlaunch-gempad-bsc/0.0.6";
   const TOKEN_SUBGRAPH = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4"
   const GRAPHQL_URL_TOKEN = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4";
-
-  const NEW_GEMLAUNCH_SUBGRAPH = "https://api.studio.thegraph.com/query/111026/test/gemlaunch"
+  const NEW_GEMLAUNCH_SUBGRAPH = "https://api.studio.thegraph.com/query/111026/test/private-sale"
 //
 
 
 const GRAPHQL_URL = "https://api.studio.thegraph.com/query/120239/gempad/0.0.3";
-
 const GRAPHQL_URL_LaunchPads =
   "https://api.studio.thegraph.com/query/120239/launchpad-subgraph/0.0.2";
 const TOKENS_SUBGRPH = "https://api.studio.thegraph.com/query/120239/launchpad-subgraph/0.0.2"
