@@ -17,7 +17,7 @@ import { socialMediaAnalyzer } from "./services/ai";
 import { asc, eq } from "drizzle-orm";
 import { insertAccolade, insertAccoladeInAccolade } from "./services/insertAccolade";
 import { accoladeQueue } from "./queues/accoladeQueue";
-import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
+import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getGivenAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
 import { db } from "./db";
 // import { redis } from "./redis/conectionCheck";
@@ -889,12 +889,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error("Failed to create referral record:", err);
             });
           // creating the Influencer Accolade.
-          // insertAccolade( Refferr , 'Influencer' );
+          insertAccolade( Refferr , 'Influencer' );
           // 🔥 Push to BullMQ queue
-          await accoladeQueue.add("createInfluencerAccolade", {
-            Refferr,
-            accolade: "Influencer",
-          });
+          // await accoladeQueue.add("createInfluencerAccolade", {
+          //   Refferr,
+          //   accolade: "Influencer",
+          // });
         }
 
         // Give welcome bonus points
@@ -1736,13 +1736,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
+      const givenAccolades = await getGivenAccoladesForUser(user.id);
+      console.log({givenAccolades})
       await Promise.all([
-        tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: false }),
-        firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
-        fairlaunchMaster({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
-        fundingVeteranHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
-        projectFounderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
-        whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: false }),
+        tokenCreatorAndSerialCreator({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: givenAccolades.includes("token_creator") }),
+        firstFunderReward({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funder") }),
+        fairlaunchMaster({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("launch_master") }),
+        fundingVeteranHandler({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("funding_veteran") }),
+        projectFounderHandler({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("project_founder") }),
+        whaleFunderHandler({ wallet: "0xb07cbbe81bbd520a9bc3b7be72f05394e5d3a8f6", graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("whale_funder") }),
         rankBasedAccolades({ user, wallet: wallet_address })
       ]);
       const accolades = await getAllAccoladesForUser(user.id);
