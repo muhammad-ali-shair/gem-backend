@@ -83,9 +83,25 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  // async getUserByWalletAddress(walletAddress: string): Promise<User | undefined> {
+  //   const [user] = await db.select().from(users).where(eq(users.walletAddress, walletAddress));
+  //   return user || undefined;
+  // }
+
   async getUserByWalletAddress(walletAddress: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.walletAddress, walletAddress));
-    return user || undefined;
+  const [user] = await db
+    .select()
+    .from(users)
+    .leftJoin(userWallets, eq(users.id, userWallets.userId))
+    .where(
+      or(
+        eq(users.walletAddress, walletAddress),     // check main wallet
+        eq(userWallets.walletAddress, walletAddress) // check extra wallets
+      )
+    );
+
+    // drizzle with join returns { users: ..., userWallets: ... }
+    return user?.users || undefined;
   }
 
   async getUserByReferralCode(ref: string): Promise<User | undefined> {
