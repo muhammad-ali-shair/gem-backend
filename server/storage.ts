@@ -552,6 +552,9 @@ export class DatabaseStorage implements IStorage {
       .insert(accolades)
       .values(accolade)
       .returning();
+    // updating the users total_Points
+    await storage.updateUserPoints(accolade.userId , accolade.points?? 0);
+  
     return newAccolade;
   }
 

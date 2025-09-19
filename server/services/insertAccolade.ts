@@ -353,7 +353,10 @@ export const insertAccoladeInAccolade = async (
     points: accoladeDef.pointsBonus ?? 0
   })
   .returning();
-  console.log({newAccolade})
+
+  // updating the users total_Points
+  await storage.updateUserPoints(user.id , accoladeDef.pointsBonus ?? 0);
+  console.log({newAccolade});
   return { message: "Accolade created", accolade: newAccolade };
 };
 async function grantAccolade(
