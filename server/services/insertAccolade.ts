@@ -325,7 +325,7 @@ export const insertAccoladeInAccolade = async (
   if (!accoladeDef) {
     return { error: "Accolade not found" };
   }
-
+  console.log({accoladeDef})
   // 2. Check if user already has it
   const [existing] = await db
     .select()
@@ -350,9 +350,10 @@ export const insertAccoladeInAccolade = async (
     level: accoladeDef.level,
     multiplier: accoladeDef.pointsBonus ?? 1,
     unlockedAt: new Date().toISOString(), 
+    points: accoladeDef.pointsBonus ?? 0
   })
   .returning();
-
+  console.log({newAccolade})
   return { message: "Accolade created", accolade: newAccolade };
 };
 async function grantAccolade(

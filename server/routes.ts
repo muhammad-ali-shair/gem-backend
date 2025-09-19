@@ -17,7 +17,7 @@ import { socialMediaAnalyzer } from "./services/ai";
 import { asc, eq } from "drizzle-orm";
 import { insertAccolade, insertAccoladeInAccolade } from "./services/insertAccolade";
 import { accoladeQueue } from "./queues/accoladeQueue";
-import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getGivenAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
+import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getAllPointEarningActivities, getGivenAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
 import { db } from "./db";
 // import { redis } from "./redis/conectionCheck";
@@ -1810,13 +1810,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sendResponse(res, 500,"Something went wrong", null); 
     }
   });
-  // CREATE LOGS
+ // GET POINTS EARNING ACTIVITIES
+ app.get("/api/points/earning/activities/:walletAddress", async (req, res) => {
+  try{
+    const {walletAddress} = req.params;
+    const activities = await getAllPointEarningActivities();
+    return sendResponse(res, 200, "Activities fetched Successfully", activities || []) 
+  }catch(err){
+    console.log({err});
+  }
+ })
   const httpServer = createServer(app);
 
   // WebSocket setup for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
-  const clients = new Set<WebSocket>();
+  const clients = new Set<WebSocket>(); 
 
   wss.on("connection", (ws) => {
     clients.add(ws);
