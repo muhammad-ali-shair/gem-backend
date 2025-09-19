@@ -28,6 +28,7 @@ import {
 import { db } from "./db";
 import { eq, desc, sql, sum, count, and, inArray, or } from "drizzle-orm";
 import { ACCOLADES } from "@shared/accolades";
+import { createAccoladeLog, getPointsEarningActivityByType } from "./helpers";
 
 export interface IStorage {
   // User operations
@@ -101,6 +102,9 @@ export class DatabaseStorage implements IStorage {
         referralCode: this.generateReferralCode(),
       })
       .returning();
+      // Giving welcome bonus
+      const points = await getPointsEarningActivityByType("welcome_bonus");
+      await createAccoladeLog({userId: user.id, accoladeName: "Welcome Bonus", accoladeType: "welcome_bonus", description: `You are rewarded with ${points} as welcome bonus`, points})
     return user;
   }
 

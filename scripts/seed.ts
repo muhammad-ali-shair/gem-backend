@@ -7,7 +7,8 @@ import {
   pointConfigs,
   blockchainEvents,
   userWallets,
-  gemAccolades
+  gemAccolades,
+  pointEarningActivities
 } from "../shared/schema";
 import { ACCOLADES } from "../shared/accolades"; // your accolades definitions
 
@@ -58,6 +59,67 @@ async function main() {
       },
     ])
     .returning();
+    // POINTS EARNING ACTIVITIES
+    await db.insert(pointEarningActivities).values([
+      {
+        type: "token_creation",
+        title: "Token Creation",
+        points: 100,
+        description: "Create a new token on Gemlaunch",
+        icon: "Rocket",
+        color: "primary",
+      },
+      {
+        type: "fair_launch",
+        title: "Fair Launch",
+        points: 250,
+        description: "Launch a fair launch campaign",
+        icon: "Flame",
+        color: "green",
+      },
+      {
+        type: "presale",
+        title: "Presale Launch",
+        points: 300,
+        description: "Create and run a presale",
+        icon: "Crown",
+        color: "yellow",
+      },
+      {
+        type: "dutch_auction",
+        title: "Dutch Auction",
+        points: 200,
+        description: "Host a Dutch auction",
+        icon: "Gavel",
+        color: "purple",
+      },
+      {
+        type: "volume_contribution",
+        title: "Volume Contribution",
+        points: 1,
+        description: "Earn points based on funding volume",
+        icon: "DollarSign",
+        color: "primary",
+        suffix: "pt / $1",
+      },
+      {
+        type: "referral",
+        title: "Successful Referral",
+        points: 50,
+        description: "User joins and contributes $20+ or creates token/presale",
+        icon: "Users",
+        color: "blue",
+      },
+      {
+        type: "welcome_bonus",
+        title: "Welcome Bonus",
+        points: 100,
+        description: "First-time registration bonus",
+        icon: "Crown",
+        color: "primary",
+      },
+    ]);
+    
 
   // --- USER WALLETS ---
   await db.insert(userWallets).values([

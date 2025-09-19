@@ -1,7 +1,7 @@
 import { Response } from "express";
 import fetch from "node-fetch";
 import { db } from "./db";
-import { accolades, accoladesHistory, gemAccolades } from "@shared/schema";
+import { accolades, accoladesHistory, gemAccolades, pointEarningActivities } from "@shared/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 
@@ -201,19 +201,16 @@ import { and, desc, eq, sql } from "drizzle-orm";
         }
     };
 
-    // export const createAccoladeLog = async (input: CreateAccoladeLogInput) => {
-    //   const [newLog] = await db
-    //     .insert(accoladesHistory)
-    //     .values({
-    //       accoladeType: input.accoladeType,
-    //       accoladeName: input.accoladeName,
-    //       description: input.description,
-    //       userId: input.userId,
-    //       points: input.points ?? 0,
-    //     })
-    //     .returning();
-    //   return newLog;
-    // }
+    
+    export const getPointsEarningActivityByType = async (type: string) => {
+      const result = await db
+        .select({ points: pointEarningActivities.points })
+        .from(pointEarningActivities)
+        .where(eq(pointEarningActivities.type, type))
+        .limit(1);
+      return result[0]?.points ?? 0; 
+    };
+
     export const createAccoladeLog = async (input: CreateAccoladeLogInput) => {
       const [existing] = await db
         .select()
@@ -241,7 +238,6 @@ import { and, desc, eq, sql } from "drizzle-orm";
       return newLog;
     };
     
-
     type GetUserAccoladesParams = {
       userId: string;
       page?: number;
@@ -272,5 +268,12 @@ import { and, desc, eq, sql } from "drizzle-orm";
         .offset(offset);
     
       return rows;
+    };
+
+    export const getAllPointEarningActivities = async () => {
+      return await db
+        .select()
+        .from(pointEarningActivities)
+        .orderBy(pointEarningActivities.id);
     };
     ///////////////////////////////////////////////////

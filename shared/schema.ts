@@ -97,6 +97,19 @@ export const accoladeProgress = pgTable("accolade_progress", {
   uniqueUserAccolade: uniqueIndex("uq_user_accolade").on(table.userId, table.accoladeId)
 }));
 
+
+export const pointEarningActivities = pgTable("point_earning_activities", (t) => ({
+  id: t.serial("id").primaryKey(),
+  type: t.varchar("type", { length: 50 }).notNull().unique(),
+  title: t.varchar("title", { length: 100 }).notNull(),
+  points: t.integer("points").notNull(),
+  description: t.text("description").notNull(),
+  icon: t.varchar("icon", { length: 50 }).notNull(),  
+  color: t.varchar("color", { length: 20 }).notNull(),
+  suffix: t.varchar("suffix", { length: 50 }),
+  createdAt: t.timestamp("created_at").defaultNow().notNull(),
+}));
+
 export const accoladeRecords = pgTable("accolade_records", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
 
