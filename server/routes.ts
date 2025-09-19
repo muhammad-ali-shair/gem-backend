@@ -237,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Broadcast activity update via WebSocket
       // broadcastUpdate({ type: "activity", data: activity }); 
       storage.updateUserPoints(user.id , points);
-      await createAccoladeLog({accoladeName: "Gem Launch", accoladeType: "gem_launch_points", userId: user.id, description: "Gem launch has gifted you points", points: Number(points)})
+      await createAccoladeLog({accoladeName: "Gem Launch", accoladeType: "gem_launch_points", userId: user.id, description: `Gem launch has gifted you ${points} points`, points: Number(points)})
       res.status(200).json({ success: true , message : 'Points updated successfully' });
     } catch (error) {
       res.status(400).json({

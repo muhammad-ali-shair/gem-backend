@@ -212,6 +212,19 @@ import { and, desc, eq, sql } from "drizzle-orm";
     };
 
     export const createAccoladeLog = async (input: CreateAccoladeLogInput) => {
+      if(input.accoladeType === "gem_launch_points"){
+        const [newLog] = await db
+        .insert(accoladesHistory)
+        .values({
+          accoladeType: input.accoladeType,
+          accoladeName: input.accoladeName,
+          description: input.description,
+          userId: input.userId,
+          points: input.points ?? 0,
+        })
+        .returning();
+      return newLog;
+      }
       const [existing] = await db
         .select()
         .from(accoladesHistory)

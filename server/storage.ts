@@ -120,7 +120,8 @@ export class DatabaseStorage implements IStorage {
       .returning();
       // Giving welcome bonus
       const points = await getPointsEarningActivityByType("welcome_bonus");
-      await createAccoladeLog({userId: user.id, accoladeName: "Welcome Bonus", accoladeType: "welcome_bonus", description: `You are rewarded with ${points} as welcome bonus`, points})
+      await createAccoladeLog({userId: user.id, accoladeName: "Welcome Bonus", accoladeType: "welcome_bonus", description: `You are rewarded with ${points} as welcome bonus`, points});
+      await storage.updateUserPoints(user.id , points || 0);
     return user;
   }
 
