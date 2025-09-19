@@ -17,9 +17,10 @@ import { socialMediaAnalyzer } from "./services/ai";
 import { asc, eq } from "drizzle-orm";
 import { insertAccolade, insertAccoladeInAccolade } from "./services/insertAccolade";
 import { accoladeQueue } from "./queues/accoladeQueue";
-import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, getAccoladeTypesByUser, getAllAccoladesForUser, getAllPointEarningActivities, getGivenAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
+import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, createUserActivity, getAccoladeTypesByUser, getActivityByType, getAllAccoladesForUser, getAllPointEarningActivities, getGivenAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, getUserActivities, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
 import { db } from "./db";
+import { PointsEarningActivityTypes } from "./constants";
 // import { redis } from "./redis/conectionCheck";
 
 //waseem
@@ -236,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
          }
       // Broadcast activity update via WebSocket
       // broadcastUpdate({ type: "activity", data: activity }); 
-      storage.updateUserPoints(user.id , points);
+      await storage.updateUserPoints(user.id , points);
       await createAccoladeLog({accoladeName: "Gem Launch", accoladeType: "gem_launch_points", userId: user.id, description: `Gem launch has gifted you ${points} points`, points: Number(points)})
       res.status(200).json({ success: true , message : 'Points updated successfully' });
     } catch (error) {
@@ -1203,7 +1204,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
     const res: any = await runGraphQLQuery(graph, query, { owner: wallet });
     
-    if (!res?.errors && res?.data?.fairlaunches) {
+    if (!res?.errors && res?.data?.fairlaunches && res?.data?.fairlaunches?.length > 0) {
+      const tokenCreationActivity = await getActivityByType(PointsEarningActivityTypes?.fair_launch?.type || "fair_launch");
+        await createUserActivity({activity_id: tokenCreationActivity.id, points: tokenCreationActivity.points, user_id: user?.id as number});
+        await createAccoladeLog({
+          accoladeName: "Fairlaunch",
+          accoladeType: "fair_launch",
+          userId: user?.id as number,
+          description: "Successfully unlocked fairlaunch activity",
+          points: tokenCreationActivity?.points
+        });
+        if(user?.id){
+          await storage.updateUserPoints(user?.id, tokenCreationActivity?.points);
+        }
       console.log(`[FairlaunchMaster] Found ${res.data.fairlaunches.length} fairlaunches for wallet: ${wallet}`);
   
       const isSuccessful = res.data.fairlaunches.some((fl: any, idx: number) => {
@@ -1292,7 +1305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tokenCount = tokens?.data?.tokens?.length || 0;
       console.log(`[TokenCreator] Found ${tokenCount} tokens for wallet=${wallet}`);
   
-      if (tokenCount !== 0) {
+      if (tokenCount > 0) {
         console.log("[TokenCreator] ✅ Eligible for Token Creator accolade");
         await insertAccoladeInAccolade(user as User, "token_creator");
         const points = await getAccoladePoints("token_creator");
@@ -1304,6 +1317,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: "Successfully created your first token",
           points
         });
+        // points activities
+        const tokenCreationActivity = await getActivityByType(PointsEarningActivityTypes?.token_creation?.type || "token_creation");
+        await createUserActivity({activity_id: tokenCreationActivity.id, points: tokenCreationActivity.points, user_id: user?.id as number});
+        await createAccoladeLog({
+          accoladeName: "Token Creation",
+          accoladeType: "token_creation",
+          userId: user?.id as number,
+          description: "Successfully unlocked token creation activity",
+          points: tokenCreationActivity?.points
+        });
+        if(user?.id){
+          await storage.updateUserPoints(user?.id, tokenCreationActivity?.points);
+        }
   
         if (tokenCount >= 5) {
           console.log("[SerialCreator] ✅ Eligible for Serial Creator accolade");
@@ -1329,7 +1355,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
     console.log(">>>>>>>>>>>>>>>>>>> tokenCreatorAndSerialCreator END <<<<<<<<<<<<<<<<<<");
   };
-  
   const fundingVeteranHandler = async ({
     wallet,
     graph,
@@ -1553,7 +1578,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       private: privateSales.length,
       subs: subscriptionPools.length
     });
-  
+    if(dutchAuctions?.lengh > 0){
+      const tokenCreationActivity = await getActivityByType(PointsEarningActivityTypes?.dutch_auction?.type || "dutch_auction");
+      await createUserActivity({activity_id: tokenCreationActivity.id, points: tokenCreationActivity.points, user_id: user?.id as number});
+      await createAccoladeLog({
+        accoladeName: "Dutch Auction",
+        accoladeType: PointsEarningActivityTypes?.dutch_auction?.type || "dutch_auction",
+        userId: user?.id as number,
+        description: "Successfully unlocked dutch auction activity",
+        points: tokenCreationActivity?.points
+      });
+      if(user?.id){
+        await storage.updateUserPoints(user?.id, tokenCreationActivity?.points);
+      }
+    }
     // Combine all project types
     const allProjects = [
       ...dutchAuctions,
@@ -1607,7 +1645,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
     return totalUSDC >= MIN_USDC;
   };
-  
   const whaleFunderHandler = async ({
     wallet,
     graph,
@@ -1663,7 +1700,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`[WhaleFunder] ❌ Not eligible, wallet=${wallet}`);
     return false;
   };
-  
   // Genesis / Pioneer / Early Adopter accolades
   const rankBasedAccolades = async ({ user, wallet }: { user: User; wallet: string }) => {
     // Fetch user rank from DB
@@ -1721,6 +1757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: "Awarded for being an early rank user",
         points,
       });
+      // if(user?.id){
+      //   await storage.updateUserPoints(user?.id, points);
+      // }
     }
   };
   const getUserRank = async (userId: number) => {
@@ -1761,65 +1800,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   })  
   // TOKENS
-  app.post("/api/get/tokens", async (req, res) => {
-    const { owner } = req.body;
-    if (!owner) {
-      sendResponse(res, 400,"Owner address is required", null); 
-    }
-    const query = `
-      query MyQuery($owner: String!) {
-        tokens(where: {owner: "${owner}"}) {
-          name
-          tokenType
-          symbol
-          owner
-          id
-        }
-      }
-    `;
-    try {
-      const response = await fetch(GRAPHQL_URL_TOKEN, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query,
-          variables: { owner },
-        }),
-      });
-      const data = await response.json();
-      if (data.data.tokens.length === 0) {
-        sendResponse(res, 200,"No token(s) found", {tokens: 0}); 
-      }
-      let user:any = await storage.getUserByWalletAddress(owner);
-      let reward = {token_creator: false, serial_creator: false};
-      if (data.data.tokens.length >= 1) {
-        await insertAccolade(user as User, "token_creator");
-        await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points: 200 })
-        reward.token_creator = true;
-      }
-      if (data.data.tokens.length >= 5) {
-        await insertAccolade(user as User, "serial_creator", 5);
-        // create accolade log to continue
-        await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points: 200 })
-        reward.serial_creator = true;
-      }
-      // check first funder - deposit in any token
-      sendResponse(res, 200,"Token fetched successfully", { tokens: data.data.tokens.length, serial_creator: reward.serial_creator, token_creator: reward.token_creator }); 
-    } catch (error) {
-      console.error(error);
-      sendResponse(res, 500,"Something went wrong", null); 
-    }
-  });
+  // app.post("/api/get/tokens", async (req, res) => {
+  //   const { owner } = req.body;
+  //   if (!owner) {
+  //     sendResponse(res, 400,"Owner address is required", null); 
+  //   }
+  //   const query = `
+  //     query MyQuery($owner: String!) {
+  //       tokens(where: {owner: "${owner}"}) {
+  //         name
+  //         tokenType
+  //         symbol
+  //         owner
+  //         id
+  //       }
+  //     }
+  //   `;
+  //   try {
+  //     const response = await fetch(GRAPHQL_URL_TOKEN, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         query,
+  //         variables: { owner },
+  //       }),
+  //     });
+  //     const data = await response.json();
+  //     if (data.data.tokens.length === 0) {
+  //       sendResponse(res, 200,"No token(s) found", {tokens: 0}); 
+  //     }
+  //     let user:any = await storage.getUserByWalletAddress(owner);
+  //     let reward = {token_creator: false, serial_creator: false};
+  //     if (data.data.tokens.length >= 1) {
+  //       await insertAccolade(user as User, "token_creator");
+  //       const points = await getAccoladePoints("token_creator")
+  //       await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points })
+  //       if(user?.id){
+  //         await storage.updateUserPoints(user?.id, points);
+  //       }
+  //       reward.token_creator = true;
+  //     }
+  //     if (data.data.tokens.length >= 5) {
+  //       await insertAccolade(user as User, "serial_creator", 5);
+  //       // create accolade log to continue
+  //       const points = await getAccoladePoints("serial_creator")
+  //       await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points })
+  //       if(user?.id){
+  //         await storage.updateUserPoints(user?.id, points);
+  //       }
+  //       reward.serial_creator = true;
+  //     }
+  //     // check first funder - deposit in any token
+  //     sendResponse(res, 200,"Token fetched successfully", { tokens: data.data.tokens.length, serial_creator: reward.serial_creator, token_creator: reward.token_creator }); 
+  //   } catch (error) {
+  //     console.error(error);
+  //     sendResponse(res, 500,"Something went wrong", null); 
+  //   }
+  // });
  // GET POINTS EARNING ACTIVITIES
- app.get("/api/points/earning/activities/:walletAddress", async (req, res) => {
-  try{
-    const {walletAddress} = req.params;
-    const activities = await getAllPointEarningActivities();
-    return sendResponse(res, 200, "Activities fetched Successfully", activities || []) 
-  }catch(err){
-    console.log({err});
-  }
- })
+  app.get("/api/points/earning/activities/:walletAddress", async (req, res) => {
+    try{
+      const { walletAddress } = req.params;
+      const user = await storage.getUserByWalletAddress(walletAddress);
+      if(user?.id){
+        const activities = await getUserActivities(user?.id);
+        return sendResponse(res, 200, "Activities fetched Successfully", activities || []); 
+      }
+      return sendResponse(res, 400, "User not found", null); 
+    }catch(err: any){
+      return sendResponse(res, 400, err?.message || "Something went wrong while fetching activities", null); 
+    }
+  })
+
   const httpServer = createServer(app);
 
   // WebSocket setup for real-time updates

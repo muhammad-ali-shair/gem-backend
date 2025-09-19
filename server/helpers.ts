@@ -1,7 +1,7 @@
 import { Response } from "express";
 import fetch from "node-fetch";
 import { db } from "./db";
-import { accolades, accoladesHistory, gemAccolades, pointEarningActivities } from "@shared/schema";
+import { accolades, accoladesHistory, gemAccolades, pointEarningActivities, userPointEarningActivities } from "@shared/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 
@@ -51,6 +51,11 @@ import { and, desc, eq, sql } from "drizzle-orm";
     export type FairLaunch = {
       softCap: string;
       purchases: Purchase[];
+    };
+    export type CreateUserActivityInput = {
+      user_id: number;
+      activity_id: number;
+      points: number;
     };
 /////////////////////// ------ HELPERS ----- //////////////////////
     export const runGraphQLQuery = async (url: string, query: string, variables = {}) => {
@@ -212,6 +217,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
     };
 
     export const createAccoladeLog = async (input: CreateAccoladeLogInput) => {
+      console.log("creatinggggggg accolade called >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", input.accoladeName)
       if(input.accoladeType === "gem_launch_points"){
         const [newLog] = await db
         .insert(accoladesHistory)
@@ -289,4 +295,52 @@ import { and, desc, eq, sql } from "drizzle-orm";
         .from(pointEarningActivities)
         .orderBy(pointEarningActivities.id);
     };
+
+    export async function getUserActivities(userId: number) {
+      // Fetch all activities
+      const allActivities = await db.select().from(pointEarningActivities);
+    
+      // Fetch user’s unlocked activities
+      const userActivities = await db
+        .select({ activityId: userPointEarningActivities.activityId })
+        .from(userPointEarningActivities)
+        .where(eq(userPointEarningActivities.userId, userId));
+    
+      const unlockedIds = new Set(userActivities.map((ua) => ua.activityId));
+  
+      // Merge isUnlocked flag
+      return allActivities.map((activity) => ({
+        ...activity,
+        isUnlocked: unlockedIds.has(activity.id),
+      }));
+    }
+
+    export const createUserActivity = async (input: CreateUserActivityInput) => {
+      const [newActivity] = await db
+        .insert(userPointEarningActivities)
+        .values({
+          userId: input.user_id,
+          activityId:input.activity_id,
+          points: input.points,
+        })
+        .returning();
+      return newActivity;
+    };
+
+    export const getActivityByType = async (type: string) => {
+      const [activity] = await db
+        .select()
+        .from(pointEarningActivities)
+        .where(eq(pointEarningActivities.type, type));
+    
+      return activity || null;
+    };
+    export const getUserPointsEarningActivities = async (userId: string) => {
+      const [activity] = await db
+        .select()
+        .from(userPointEarningActivities)
+        .where(eq(userPointEarningActivities.userId, userId));
+      return activity || null;
+    };
+
     ///////////////////////////////////////////////////

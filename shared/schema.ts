@@ -162,6 +162,15 @@ export const userWallets = pgTable("user_wallets", {
   createdAt: timestamp("created_at", { withTimezone: false }).defaultNow().notNull(),
 });
 
+export const userPointEarningActivities = pgTable("user_point_earning_activities", (t) => ({
+  id: t.serial("id").primaryKey(),
+  userId: t.integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  activityId: t.integer("activity_id")
+    .notNull()
+    .references(() => pointEarningActivities.id, { onDelete: "cascade" }),
+  points: t.integer("points").notNull(),
+  createdAt: t.timestamp("created_at").defaultNow().notNull(),
+}));
 // Relations remain the same
 export const usersRelations = relations(users, ({ many, one }) => ({
   activities: many(activities),

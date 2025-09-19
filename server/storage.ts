@@ -28,7 +28,8 @@ import {
 import { db } from "./db";
 import { eq, desc, sql, sum, count, and, inArray, or } from "drizzle-orm";
 import { ACCOLADES } from "@shared/accolades";
-import { createAccoladeLog, getPointsEarningActivityByType } from "./helpers";
+import { createAccoladeLog, createUserActivity, getActivityByType, getPointsEarningActivityByType } from "./helpers";
+import { PointsEarningActivityTypes } from "./constants";
 
 export interface IStorage {
   // User operations
@@ -119,13 +120,15 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
       // Giving welcome bonus
-      const points = await getPointsEarningActivityByType("welcome_bonus");
-      await createAccoladeLog({userId: user.id, accoladeName: "Welcome Bonus", accoladeType: "welcome_bonus", description: `You are rewarded with ${points} as welcome bonus`, points});
-      await storage.updateUserPoints(user.id , points || 0);
+      const tokenCreationActivity:any = await getActivityByType(PointsEarningActivityTypes?.welcome_bonus?.type || "welcome_bonus");
+      await createUserActivity({activity_id: tokenCreationActivity.id, points: tokenCreationActivity.points, user_id: user?.id as number});
+      await createAccoladeLog({userId: user.id, accoladeName: "Welcome Bonus", accoladeType: "welcome_bonus", description: `You are rewarded with ${tokenCreationActivity?.points} as welcome bonus`, points: tokenCreationActivity?.points });
+      await storage.updateUserPoints(user.id , tokenCreationActivity?.points || 0);
     return user;
   }
 
   async updateUserPoints(userId: number, points: number): Promise<void> {
+    console.log("updateUserPoints called >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", points)
     await db
       .update(users)
       .set({ 
@@ -225,8 +228,8 @@ export class DatabaseStorage implements IStorage {
   //   }));
   // }
 
-  async getLeaderboard(limit = 100): Promise<Array<User & { rank: number; accolades: Accolade[] }>> {
-    // Get all users with their wallet information
+  async getLeaderboard(limit = 100): Promise<Array<User & { rank: number }>> {
+    // Get all users with their wallet information including totalPoints
     const usersWithWallets = await db
       .select({
         id: users.id,
@@ -247,18 +250,9 @@ export class DatabaseStorage implements IStorage {
         updatedAt: users.updatedAt,
         isMainAccount: users.isMainAccount,
         parentUserId: users.parentUserId,
+        totalPoints: users.totalPoints,  // ✅ use directly
       })
       .from(users);
-  
-    // Fetch all accolades
-    const allAccolades = await db.select().from(accolades);
-  
-    // Group accolades by userId
-    const accoladesByUser: Record<number, Accolade[]> = {};
-    allAccolades.forEach((a) => {
-      if (!accoladesByUser[a.userId]) accoladesByUser[a.userId] = [];
-      accoladesByUser[a.userId].push(a);
-    });
   
     // Filter to only main accounts and consolidate points from connected wallets
     const mainAccounts = usersWithWallets.filter((user) => user.isMainAccount);
@@ -269,19 +263,14 @@ export class DatabaseStorage implements IStorage {
         (u) => u.parentUserId === mainAccount.id
       );
   
-      // Collect accolades from main + connected wallets
-      const userAccolades = [
-        ...(accoladesByUser[mainAccount.id] || []),
-        ...connectedWallets.flatMap((w) => accoladesByUser[w.id] || []),
-      ];
-  
-      // Sum points from accolades
-      const totalPoints = userAccolades.reduce((sum, acc) => sum + (acc.points ?? 0), 0);
+      // ✅ Sum totalPoints directly from main + connected wallets
+      const totalPoints =
+        mainAccount.totalPoints +
+        connectedWallets.reduce((sum, w) => sum + (w.totalPoints ?? 0), 0);
   
       return {
         ...mainAccount,
         totalPoints,
-        accolades: userAccolades,
       };
     });
   
@@ -296,6 +285,7 @@ export class DatabaseStorage implements IStorage {
   
     return rankedUsers;
   }
+  
   
 
   async getUserRank(userId: number): Promise<number> {
@@ -842,54 +832,54 @@ profileData)
     level: accoladeDef.level,
     multiplier: accoladeDef.pointsBonus ?? 1,
   });
-};
+  };
 
-async updateAccoladeProgress({
-  userId,
-  accoladeId,
-  progress,
-  target,
-  completed = false,
-}: {
-  userId: number;
-  accoladeId: number;
-  progress: number;
-  target: number;
-  completed: boolean;
-}) {
-  // Check if progress exists
-  const [existing] = await db
-    .select()
-    .from(accoladeProgress)
-    .where(
-      and(
-        eq(accoladeProgress.userId, userId),
-        eq(accoladeProgress.accoladeId, accoladeId)
-      )
-    );
-
-  if (existing) {
-    // Only update if progress increased
-    if (progress > existing.progress) {
-      await db
-        .update(accoladeProgress)
-        .set({ progress , completed })
-        .where(eq(accoladeProgress.id, existing.id));
-    }
-    return { updated: true, progress: Math.max(progress, existing.progress), target };
-  }
-
-  // Insert new row
-  await db.insert(accoladeProgress).values({
+  async updateAccoladeProgress({
     userId,
     accoladeId,
     progress,
     target,
-    completed,
-  });
+    completed = false,
+  }: {
+    userId: number;
+    accoladeId: number;
+    progress: number;
+    target: number;
+    completed: boolean;
+  }) {
+    // Check if progress exists
+    const [existing] = await db
+      .select()
+      .from(accoladeProgress)
+      .where(
+        and(
+          eq(accoladeProgress.userId, userId),
+          eq(accoladeProgress.accoladeId, accoladeId)
+        )
+      );
 
-  return { created: true, progress, target };
-};
+    if (existing) {
+      // Only update if progress increased
+      if (progress > existing.progress) {
+        await db
+          .update(accoladeProgress)
+          .set({ progress , completed })
+          .where(eq(accoladeProgress.id, existing.id));
+      }
+      return { updated: true, progress: Math.max(progress, existing.progress), target };
+    }
+
+    // Insert new row
+    await db.insert(accoladeProgress).values({
+      userId,
+      accoladeId,
+      progress,
+      target,
+      completed,
+    });
+
+    return { created: true, progress, target };
+  };
 
 
   
