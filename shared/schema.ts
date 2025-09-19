@@ -79,6 +79,7 @@ export const accolades = pgTable("accolades", {
   level: integer("level").default(1).notNull(),
   multiplier: real("multiplier").default(0.00).notNull(),
   unlockedAt: text("unlocked_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  points: integer("points").default(0),
 });
 
 export const accoladeProgress = pgTable("accolade_progress", {
