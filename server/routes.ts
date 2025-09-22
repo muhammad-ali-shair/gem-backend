@@ -20,7 +20,7 @@ import { accoladeQueue } from "./queues/accoladeQueue";
 import { convertBNBtoUSDC, countSuccessfulLaunchpads, createAccoladeLog, createUserActivity, getAccoladeTypesByUser, getActivityByType, getAllAccoladesForUser, getAllPointEarningActivities, getGivenAccoladesForUser, getTotalRaisedInBNB, getUserAccoladesHistory, getUserActivities, isAnyFairLaunchSuccessful, markUserAccolades, runGraphQLQuery, sendResponse } from "./helpers";
 import { useTransition } from "react";
 import { db } from "./db";
-import { PointsEarningActivityTypes } from "./constants";
+import { ActivityKey, PointsEarningActivityTypes } from "./constants";
 // import { redis } from "./redis/conectionCheck";
 
 //waseem
@@ -1767,6 +1767,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const index = user.findIndex(u => u.id === userId);
     return index >= 0 ? index + 1 : null;
   };
+
+  const awardLaunchActivity = async ({
+    type,
+    accoladeName,
+    accoladeType,
+    description,
+    user
+  }: {
+    type: ActivityKey;
+    accoladeName: string;
+    accoladeType: string;
+    description: string;
+    user: User;
+  }) => {
+    const activity = await getActivityByType(
+      PointsEarningActivityTypes?.[type]?.type || type
+    );
+  
+    if (!activity) {
+      console.warn(`[Launch activity] No activity found for type=${type}`);
+      return;
+    }
+  
+    // ✅ Create user activity record
+    await createUserActivity({
+      activity_id: activity.id,
+      points: activity.points,
+      user_id: user?.id as number
+    });
+  
+    // ✅ Create accolade log
+    await createAccoladeLog({
+      accoladeName,
+      accoladeType,
+      userId: user?.id as number,
+      description,
+      points: activity?.points
+    });
+  
+    // ✅ Update user total points
+    if (user?.id) {
+      await storage.updateUserPoints(user?.id, activity?.points);
+    }
+  };
+  
+  const checkUserPreSaleHandler = async ({
+    wallet,
+    graph,
+    user,
+    isGiven = false
+  }: {
+    wallet: string;
+    graph: string;
+    user: User;
+    isGiven: Boolean;
+  }) => {
+    if (isGiven) {
+      console.log(`[Presale activity] Skipping, accolade already given for wallet=${wallet}`);
+      return false;
+    }
+    const query = `
+      query MyQuery($owner: String!) {
+        privateSales(where: {owner: $owner}) {
+          owner
+          softCap
+          token
+          tokenDecimals
+        }
+      }
+    `;
+    const res: any = await runGraphQLQuery(graph, query, { owner: wallet });
+    if (res?.data?.privateSales?.length > 0) {
+      console.log('[presale] => awarding presale activity');
+      await awardLaunchActivity({
+        type: "presale",
+        accoladeName: "Presale Launch",
+        accoladeType: "presale",
+        description: "Successfully unlocked presale launch activity",
+        user
+      });
+    }
+    
+    if (res?.data?.dutchAuctions?.length > 0) {
+      console.log('[dutch_auction] => awarding dutch auction activity');
+      await awardLaunchActivity({
+        type: "dutch_auction",
+        accoladeName: "Dutch Auction Launch",
+        accoladeType: "dutch_auction",
+        description: "Successfully unlocked dutch auction activity",
+        user
+      });
+    }
+    
+    if (res?.data?.fairlaunches?.length > 0) {
+      console.log('[fair_launch] => awarding fair launch activity');
+      await awardLaunchActivity({
+        type: "fair_launch",
+        accoladeName: "Fair Launch",
+        accoladeType: "fair_launch",
+        description: "Successfully unlocked fair launch activity",
+        user
+      });
+    }
+    
+  };
+  
   //AVAILBLE ACCOLADES
   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
@@ -1798,7 +1904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { wallet_address } = req.params;
     const user:any = await storage.getUserByWalletAddress(wallet_address);
 
-  })  
+  }) 
   // TOKENS
   // app.post("/api/get/tokens", async (req, res) => {
   //   const { owner } = req.body;
@@ -1861,7 +1967,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/points/earning/activities/:walletAddress", async (req, res) => {
     try{
       const { walletAddress } = req.params;
-      const user = await storage.getUserByWalletAddress(walletAddress);
+      const user: User | undefined = await storage.getUserByWalletAddress(walletAddress);
+      console.log({user})
+      await checkUserPreSaleHandler({graph: NEW_GEMLAUNCH_SUBGRAPH, isGiven: false, user: user as User , wallet: walletAddress}); // to be fixed is given and wallet
+      // here
       if(user?.id){
         const activities = await getUserActivities(user?.id);
         return sendResponse(res, 200, "Activities fetched Successfully", activities || []); 

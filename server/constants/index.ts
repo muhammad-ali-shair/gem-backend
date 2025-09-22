@@ -1,4 +1,4 @@
-type ActivityKey =
+export type ActivityKey =
   | "token_creation"
   | "fair_launch"
   | "presale"
