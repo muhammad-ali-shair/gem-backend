@@ -1922,6 +1922,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           token
           tokenDecimals
         }
+        dutchAuctions(where: {owner: $owner}) {
+          owner
+          totalRaisedBNB
+          totalRaised
+          tokenDecimals
+          token
+          hardCap
+        }
+        fairlaunches(where: {owner: $owner}) {
+          owner
+          token
+          tokenDecimals
+          totalRaised
+          totalRaisedBNB
+          fundToken
+        }
       }
     `;
     const res: any = await runGraphQLQuery(graph, query, { owner: wallet });
@@ -1959,7 +1975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
   };
-
+  ////////// checks if user has participated in any purchase
   const preSaleParticipantHandler = async ({
     wallet,
     graph,
@@ -2017,7 +2033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   
   
-  //AVAILBLE ACCOLADES
+  ////////// AVAILBLE ACCOLADES - Fetching all accolades and marking user claimed accolades
   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
       const { wallet_address } = req.params;
@@ -2026,7 +2042,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
       const givenAccolades = await getGivenAccoladesForUser(user.id);
-      console.log({givenAccolades})
       await Promise.all([
         tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: givenAccolades.includes("token_creator") }),
         firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funding") }),
@@ -2045,70 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/earned/accolades/:wallet_address", async(req, res) => { 
-    const { wallet_address } = req.params;
-    const user:any = await storage.getUserByWalletAddress(wallet_address);
-
-  }) 
-  // TOKENS
-  // app.post("/api/get/tokens", async (req, res) => {
-  //   const { owner } = req.body;
-  //   if (!owner) {
-  //     sendResponse(res, 400,"Owner address is required", null); 
-  //   }
-  //   const query = `
-  //     query MyQuery($owner: String!) {
-  //       tokens(where: {owner: "${owner}"}) {
-  //         name
-  //         tokenType
-  //         symbol
-  //         owner
-  //         id
-  //       }
-  //     }
-  //   `;
-  //   try {
-  //     const response = await fetch(GRAPHQL_URL_TOKEN, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         query,
-  //         variables: { owner },
-  //       }),
-  //     });
-  //     const data = await response.json();
-  //     if (data.data.tokens.length === 0) {
-  //       sendResponse(res, 200,"No token(s) found", {tokens: 0}); 
-  //     }
-  //     let user:any = await storage.getUserByWalletAddress(owner);
-  //     let reward = {token_creator: false, serial_creator: false};
-  //     if (data.data.tokens.length >= 1) {
-  //       await insertAccolade(user as User, "token_creator");
-  //       const points = await getAccoladePoints("token_creator")
-  //       await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points })
-  //       if(user?.id){
-  //         await storage.updateUserPoints(user?.id, points);
-  //       }
-  //       reward.token_creator = true;
-  //     }
-  //     if (data.data.tokens.length >= 5) {
-  //       await insertAccolade(user as User, "serial_creator", 5);
-  //       // create accolade log to continue
-  //       const points = await getAccoladePoints("serial_creator")
-  //       await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points })
-  //       if(user?.id){
-  //         await storage.updateUserPoints(user?.id, points);
-  //       }
-  //       reward.serial_creator = true;
-  //     }
-  //     // check first funder - deposit in any token
-  //     sendResponse(res, 200,"Token fetched successfully", { tokens: data.data.tokens.length, serial_creator: reward.serial_creator, token_creator: reward.token_creator }); 
-  //   } catch (error) {
-  //     console.error(error);
-  //     sendResponse(res, 500,"Something went wrong", null); 
-  //   }
-  // });
- // GET POINTS EARNING ACTIVITIES
+  ////////// GET POINTS EARNING ACTIVITIES - To get points earning activities and mark isGiven if user has claimed it
   app.get("/api/points/earning/activities/:walletAddress", async (req, res) => {
     try{
       const { walletAddress } = req.params;
