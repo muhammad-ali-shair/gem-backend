@@ -1168,6 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[FirstFunderReward] ❌ Wallet ${wallet} has purchases but all are 0 BNB`);
       }
     } else {
+      
       console.error(`[FirstFunderReward] GraphQL query failed for wallet: ${wallet}`, res?.errors);
     }
   
@@ -1650,61 +1651,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
     return totalUSDC >= MIN_USDC;
   };
+  // const whaleFunderHandler = async ({
+  //   wallet,
+  //   graph,
+  //   user,
+  //   isGiven = false,
+  //   thresholdUSDC = 10000
+  // }: {
+  //   wallet: string;
+  //   graph: string;
+  //   user: User | undefined;
+  //   isGiven: Boolean;
+  //   thresholdUSDC?: number;
+  // }) => {
+  //   console.log(">>>>>>>>>>>>>>>>>>> whaleFunderHandler <<<<<<<<<<<<<<<<<<")
+  //   if (isGiven) {
+  //     console.log(`[WhaleFunder] Skipping, accolade already given for wallet=${wallet}`);
+  //     return false;
+  //   }
+  
+  //   const query = `
+  //     query MyQuery($buyer: String!) {
+  //       dutchPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+  //       fairPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+  //       privatePurchases(where: {buyer: $buyer}) { fundAmountBNB }
+  //       subscriptionPurchases(where: {buyer: $buyer}) { fundAmountBNB }
+  //       purchases(where: {buyer: $buyer}) { fundAmountBNB }
+  //     }
+  //   `;
+  
+  //   const res: any = await runGraphQLQuery(graph, query, { buyer: wallet });
+  
+  //   if (res?.errors) {
+  //     console.error(`[WhaleFunder] GraphQL query failed for wallet=${wallet}`, res.errors);
+  //     return false;
+  //   }
+  
+  //   const exists = await hasWhaleFunding(res);
+  
+  //   if (exists && user) {
+  //     console.log(`[WhaleFunder] ✅ Awarding Whale Funder to wallet=${wallet}`);
+  //     await insertAccoladeInAccolade(user, "whale_funder");
+  //     const points = await getAccoladePoints("whale_funder");
+  //     await createAccoladeLog({
+  //       accoladeName: "Whale Funder",
+  //       accoladeType: "whale_funder",
+  //       userId: user.id,
+  //       description: `You invested ${thresholdUSDC}+ USDC across launches`,
+  //       points
+  //     });
+  //     return true;
+  //   }
+  
+  //   console.log(`[WhaleFunder] ❌ Not eligible, wallet=${wallet}`);
+  //   return false;
+  // };
   const whaleFunderHandler = async ({
     wallet,
     graph,
     user,
-    isGiven = false,
+    isGivenWhale = false,
+    isGivenSupporter = false,
     thresholdUSDC = 10000
   }: {
     wallet: string;
     graph: string;
     user: User | undefined;
-    isGiven: Boolean;
+    isGivenWhale: boolean;
+    isGivenSupporter: boolean;
     thresholdUSDC?: number;
   }) => {
-    console.log(">>>>>>>>>>>>>>>>>>> whaleFunderHandler <<<<<<<<<<<<<<<<<<")
-    if (isGiven) {
-      console.log(`[WhaleFunder] Skipping, accolade already given for wallet=${wallet}`);
-      return false;
-    }
+    console.log(">>>>>>>>>>>>>>>>>>> launchFundingHandlers <<<<<<<<<<<<<<<<<<");
   
     const query = `
       query MyQuery($buyer: String!) {
-        dutchPurchases(where: {buyer: $buyer}) { fundAmountBNB }
-        fairPurchases(where: {buyer: $buyer}) { fundAmountBNB }
-        privatePurchases(where: {buyer: $buyer}) { fundAmountBNB }
-        subscriptionPurchases(where: {buyer: $buyer}) { fundAmountBNB }
-        purchases(where: {buyer: $buyer}) { fundAmountBNB }
+        dutchPurchases(where: {buyer: $buyer}) { fundAmountBNB id }
+        fairPurchases(where: {buyer: $buyer}) { fundAmountBNB id }
+        privatePurchases(where: {buyer: $buyer}) { fundAmountBNB id }
+        subscriptionPurchases(where: {buyer: $buyer}) { fundAmountBNB id }
+        purchases(where: {buyer: $buyer}) { fundAmountBNB id }
       }
     `;
   
     const res: any = await runGraphQLQuery(graph, query, { buyer: wallet });
   
     if (res?.errors) {
-      console.error(`[WhaleFunder] GraphQL query failed for wallet=${wallet}`, res.errors);
+      console.error(`[LaunchFundingHandlers] GraphQL query failed for wallet=${wallet}`, res.errors);
       return false;
     }
   
-    const exists = await hasWhaleFunding(res);
-  
-    if (exists && user) {
-      console.log(`[WhaleFunder] ✅ Awarding Whale Funder to wallet=${wallet}`);
-      await insertAccoladeInAccolade(user, "whale_funder");
-      const points = await getAccoladePoints("whale_funder");
-      await createAccoladeLog({
-        accoladeName: "Whale Funder",
-        accoladeType: "whale_funder",
-        userId: user.id,
-        description: `You invested ${thresholdUSDC}+ USDC across launches`,
-        points
-      });
-      return true;
+    // =============== Whale Funder Check ===============
+    if (!isGivenWhale) {
+      const exists = await hasWhaleFunding(res, thresholdUSDC); // your existing helper
+      if (exists && user) {
+        console.log(`[WhaleFunder] ✅ Awarding Whale Funder to wallet=${wallet}`);
+        await insertAccoladeInAccolade(user, "whale_funder");
+        const points = await getAccoladePoints("whale_funder");
+        await createAccoladeLog({
+          accoladeName: "Whale Funder",
+          accoladeType: "whale_funder",
+          userId: user.id,
+          description: `You invested ${thresholdUSDC}+ USDC across launches`,
+          points
+        });
+      } else {
+        console.log(`[WhaleFunder] ❌ Not eligible, wallet=${wallet}`);
+      }
     }
   
-    console.log(`[WhaleFunder] ❌ Not eligible, wallet=${wallet}`);
-    return false;
+    // =============== Launch Supporter Check ===============
+    if (!isGivenSupporter) {
+      const categories = [
+        "dutchPurchases",
+        "fairPurchases",
+        "privatePurchases",
+        "subscriptionPurchases",
+        "purchases"
+      ];
+  
+      const distinctLaunches = categories.filter(
+        (c) => res?.data?.[c]?.length > 0
+      ).length;
+  
+      if (distinctLaunches >= 2 && user) {
+        console.log(
+          `[LaunchSupporter] ✅ Awarding Launch Supporter (participated in ${distinctLaunches} launch types) to wallet=${wallet}`
+        );
+        await insertAccoladeInAccolade(user, "launch_supporter");
+        const points = await getAccoladePoints("launch_supporter");
+        await createAccoladeLog({
+          accoladeName: "Launch Supporter",
+          accoladeType: "launch_supporter",
+          userId: user.id,
+          description: `You participated in ${distinctLaunches} different token launches`,
+          points
+        });
+      } else {
+        console.log(`[LaunchSupporter] ❌ Not eligible, wallet=${wallet}`);
+      }
+    }
   };
+  
   // Genesis / Pioneer / Early Adopter accolades
   const rankBasedAccolades = async ({ user, wallet }: { user: User; wallet: string }) => {
     // Fetch user rank from DB
@@ -1840,6 +1927,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           token
           tokenDecimals
         }
+        dutchAuctions(where: {owner: $owner}) {
+          owner
+          totalRaisedBNB
+          totalRaised
+          tokenDecimals
+          token
+          hardCap
+        }
+        fairlaunches(where: {owner: $owner}) {
+          owner
+          token
+          tokenDecimals
+          totalRaised
+          totalRaisedBNB
+          fundToken
+        }
       }
     `;
     const res: any = await runGraphQLQuery(graph, query, { owner: wallet });
@@ -1877,8 +1980,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
   };
+  ////////// checks if user has participated in any purchase
+  const preSaleParticipantHandler = async ({
+    wallet,
+    graph,
+    user,
+    isGiven = false
+  }: {
+    wallet: string;
+    graph: string;
+    user: User | undefined;
+    isGiven: boolean;
+  }) => {
+    if (isGiven) {
+      console.log(`[Presale Participant] Skipping, already given for wallet=${wallet}`);
+      return false;
+    }
+    console.log(`[Presale Participant] enteredddddddd wallet=${wallet}`);
   
-  //AVAILBLE ACCOLADES
+    const query = `
+      query MyQuery($buyer: String!) {
+        privatePurchases(where: {buyer: $buyer}) {
+          buyer
+          transactionHash
+          id
+          fundAmountBNB
+          fundAmount
+          blockNumber
+          blockTimestamp
+        }
+      }
+    `;
+  
+    try {
+      const res: any = await runGraphQLQuery(graph, query, { buyer: wallet });
+  
+      if (!res?.errors && res?.data?.privatePurchases?.length > 0) {
+        console.log("[presale_participant] => awarding presale participant reward");
+        await insertAccoladeInAccolade(user as User, "presale_participant");
+        const points = await getAccoladePoints("presale_participant");
+        console.log(`[TokenCreator] "presale_participant" accolade with ${points} points`);
+        await createAccoladeLog({
+          accoladeName: "Presale Participant",
+          accoladeType: "presale_participant",
+          userId: user?.id as number,
+          description: "You participated in private sale",
+          points
+        });
+        return true;
+      }
+      console.log(`[Presale Participant] not found wallet=${wallet}`);
+    } catch (err) {
+      console.error("[presale_participant] Error:", err);
+    }
+  
+    return false;
+  };
+  
+  
+  ////////// AVAILBLE ACCOLADES - Fetching all accolades and marking user claimed accolades
   app.get("/api/available/accolades/:wallet_address", async (req, res) => {
     try {
       const { wallet_address } = req.params;
@@ -1895,7 +2055,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fairlaunchMaster({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("launch_master") }),
         fundingVeteranHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("funding_veteran") }),
         projectFounderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("project_founder") }),
-        whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("whale_funder") }),
+        whaleFunderHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGivenWhale: givenAccolades.includes("whale_funder"), isGivenSupporter:givenAccolades.includes("launch_supporter") }),
+        preSaleParticipantHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("presale_participant") }),
         rankBasedAccolades({ user, wallet: wallet_address })
       ]);
       const accolades = await getAllAccoladesForUser(user.id);
@@ -1906,70 +2067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/earned/accolades/:wallet_address", async(req, res) => {
-    const { wallet_address } = req.params;
-    const user:any = await storage.getUserByWalletAddress(wallet_address);
-
-  }) 
-  // TOKENS
-  // app.post("/api/get/tokens", async (req, res) => {
-  //   const { owner } = req.body;
-  //   if (!owner) {
-  //     sendResponse(res, 400,"Owner address is required", null); 
-  //   }
-  //   const query = `
-  //     query MyQuery($owner: String!) {
-  //       tokens(where: {owner: "${owner}"}) {
-  //         name
-  //         tokenType
-  //         symbol
-  //         owner
-  //         id
-  //       }
-  //     }
-  //   `;
-  //   try {
-  //     const response = await fetch(GRAPHQL_URL_TOKEN, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         query,
-  //         variables: { owner },
-  //       }),
-  //     });
-  //     const data = await response.json();
-  //     if (data.data.tokens.length === 0) {
-  //       sendResponse(res, 200,"No token(s) found", {tokens: 0}); 
-  //     }
-  //     let user:any = await storage.getUserByWalletAddress(owner);
-  //     let reward = {token_creator: false, serial_creator: false};
-  //     if (data.data.tokens.length >= 1) {
-  //       await insertAccolade(user as User, "token_creator");
-  //       const points = await getAccoladePoints("token_creator")
-  //       await createAccoladeLog({accoladeName: "Token Creator", accoladeType: "token_creator", userId: user?.id as number, description: "Successfully created your first token", points })
-  //       if(user?.id){
-  //         await storage.updateUserPoints(user?.id, points);
-  //       }
-  //       reward.token_creator = true;
-  //     }
-  //     if (data.data.tokens.length >= 5) {
-  //       await insertAccolade(user as User, "serial_creator", 5);
-  //       // create accolade log to continue
-  //       const points = await getAccoladePoints("serial_creator")
-  //       await createAccoladeLog({accoladeName: "Serial Creator", accoladeType: "serial_creator", userId: user?.id as number, description: "Successfully launched 5+ tokens!", points })
-  //       if(user?.id){
-  //         await storage.updateUserPoints(user?.id, points);
-  //       }
-  //       reward.serial_creator = true;
-  //     }
-  //     // check first funder - deposit in any token
-  //     sendResponse(res, 200,"Token fetched successfully", { tokens: data.data.tokens.length, serial_creator: reward.serial_creator, token_creator: reward.token_creator }); 
-  //   } catch (error) {
-  //     console.error(error);
-  //     sendResponse(res, 500,"Something went wrong", null); 
-  //   }
-  // });
- // GET POINTS EARNING ACTIVITIES
+  ////////// GET POINTS EARNING ACTIVITIES - To get points earning activities and mark isGiven if user has claimed it
   app.get("/api/points/earning/activities/:walletAddress", async (req, res) => {
     try{
       const { walletAddress } = req.params;
