@@ -326,7 +326,7 @@ export interface AccoladeDefinition {
 // ];
 
 
-export const ACCOLADES: AccoladeDefinition[] = [
+export const ACCOLADES: AccoladeDefinition[] = [ // referrer
   // PIONEER CATEGORY (Keep first 3 at top as requested)
   {
     symbol: 'genesis_member',
@@ -502,6 +502,18 @@ export const ACCOLADES: AccoladeDefinition[] = [
     pointsBonus: 2000,
     multiplier: 1.2,
     rarity: 'rare'
+  },
+  {
+    symbol: 'referrer',
+    name: 'Referrer',
+    description: 'Successfully refer 5 friends to join Gemlaunch.',
+    icon: 'Handshake',
+    category: 'social',
+    level: 2,
+    criteria: 'Referring friends who invest in gemalaunch projects',
+    multiplier: 1.2,
+    pointsBonus: 500,
+    rarity: 'uncommon'
   },
   {
     symbol: 'platform_devotee',

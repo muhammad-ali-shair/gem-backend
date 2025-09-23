@@ -1,13 +1,13 @@
-import { 
-  users, 
-  activities, 
-  referrals, 
-  accolades, 
-  pointConfigs, 
+import {
+  users,
+  activities,
+  referrals,
+  accolades,
+  pointConfigs,
   blockchainEvents,
   userWallets,
   gemAccolades,
-  type User, 
+  type User,
   type InsertUser,
   type Activity,
   type InsertActivity,
@@ -22,13 +22,17 @@ import {
   type UserWallet,
   type InsertUserWallet,
   accoladeProgress,
-  gemAccolades,
-  GemAccolades
+  GemAccolades,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, sum, count, and, inArray, or } from "drizzle-orm";
 import { ACCOLADES } from "@shared/accolades";
-import { createAccoladeLog, createUserActivity, getActivityByType, getPointsEarningActivityByType } from "./helpers";
+import {
+  createAccoladeLog,
+  createUserActivity,
+  getActivityByType,
+  getPointsEarningActivityByType,
+} from "./helpers";
 import { PointsEarningActivityTypes } from "./constants";
 
 export interface IStorage {
@@ -38,41 +42,59 @@ export interface IStorage {
   getUserByReferralCode(ref: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPoints(userId: number, points: number): Promise<void>;
-  updateUserProfile(walletAddress: string, profileData: Partial<User>): Promise<User>;
-  
+  updateUserProfile(
+    walletAddress: string,
+    profileData: Partial<User>
+  ): Promise<User>;
+
   // User wallet operations
   getUserWallets(userId: number): Promise<UserWallet[]>;
   addUserWallet(wallet: InsertUserWallet): Promise<UserWallet>;
   removeUserWallet(walletId: number): Promise<void>;
-  
+
   // Leaderboard operations
   getLeaderboard(limit?: number): Promise<Array<User & { rank: number }>>;
   getUserRank(userId: number): Promise<number>;
-  
+
   // Activity operations
   createActivity(activity: InsertActivity): Promise<Activity>;
   getUserActivities(userId: number, limit?: number): Promise<Activity[]>;
-  getRecentActivities(limit?: number): Promise<Array<Activity & { user: User }>>;
-  
+  getRecentActivities(
+    limit?: number
+  ): Promise<Array<Activity & { user: User }>>;
+
   // Referral operations
   createReferral(referral: InsertReferral): Promise<Referral>;
-  getUserReferrals(userId: number): Promise<Array<Referral & { referee: User }>>;
-  getReferralStats(userId: number): Promise<{ count: number; totalPoints: number }>;
-  getReferralLeaderboard(limit?: number): Promise<Array<{ user: User; qualifiedReferrals: number; totalReferralPoints: number; rank: number }>>;
-  
+  getUserReferrals(
+    userId: number
+  ): Promise<Array<Referral & { referee: User }>>;
+  getReferralStats(
+    userId: number
+  ): Promise<{ count: number; totalPoints: number }>;
+  getReferralLeaderboard(
+    limit?: number
+  ): Promise<
+    Array<{
+      user: User;
+      qualifiedReferrals: number;
+      totalReferralPoints: number;
+      rank: number;
+    }>
+  >;
+
   // Accolade operations
   getUserAccolades(userId: number): Promise<Accolade[]>;
   createAccolade(accolade: InsertAccolade): Promise<Accolade>;
-  
+
   // Point config operations
   getPointConfigs(): Promise<PointConfig[]>;
   updatePointConfig(activityType: string, basePoints: number): Promise<void>;
-  
+
   // Blockchain operations
   createBlockchainEvent(event: InsertBlockchainEvent): Promise<BlockchainEvent>;
   getUnprocessedEvents(): Promise<BlockchainEvent[]>;
   markEventProcessed(eventId: number): Promise<void>;
-  
+
   // Admin operations
   deleteUser(userId: number): Promise<void>;
   getAllAccolades(): Promise<Array<Accolade & { user: User }>>;
@@ -90,24 +112,31 @@ export class DatabaseStorage implements IStorage {
   //   return user || undefined;
   // }
 
-  async getUserByWalletAddress(walletAddress: string): Promise<User | undefined> {
-  const [user] = await db
-    .select()
-    .from(users)
-    .leftJoin(userWallets, eq(users.id, userWallets.userId))
-    .where(
-      or(
-        eq(users.walletAddress, walletAddress),     // check main wallet
-        eq(userWallets.walletAddress, walletAddress) // check extra wallets
-      )
-    );
+  async getUserByWalletAddress(
+    walletAddress: string
+  ): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .leftJoin(userWallets, eq(users.id, userWallets.userId))
+      .where(
+        or(
+          eq(users.walletAddress, walletAddress), // check main wallet
+          eq(userWallets.walletAddress, walletAddress) // check extra wallets
+        )
+      );
 
     // drizzle with join returns { users: ..., userWallets: ... }
     return user?.users || undefined;
   }
 
   async getUserByReferralCode(ref: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(or(eq(users.customReferralCode, ref), eq(users.referralCode, ref)));
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        or(eq(users.customReferralCode, ref), eq(users.referralCode, ref))
+      );
     return user || undefined;
   }
 
@@ -119,21 +148,46 @@ export class DatabaseStorage implements IStorage {
         referralCode: this.generateReferralCode(),
       })
       .returning();
-      // Giving welcome bonus
-      const tokenCreationActivity:any = await getActivityByType(PointsEarningActivityTypes?.welcome_bonus?.type || "welcome_bonus");
-      await createUserActivity({activity_id: tokenCreationActivity.id, points: tokenCreationActivity.points, user_id: user?.id as number});
-      await createAccoladeLog({userId: user.id, accoladeName: "Welcome Bonus", accoladeType: "welcome_bonus", description: `You are rewarded with ${tokenCreationActivity?.points} as welcome bonus`, points: tokenCreationActivity?.points });
-      await storage.updateUserPoints(user.id , tokenCreationActivity?.points || 0);
+    // Giving welcome bonus
+    const tokenCreationActivity: any = await getActivityByType(
+      PointsEarningActivityTypes?.welcome_bonus?.type || "welcome_bonus"
+    );
+    await createUserActivity({
+      activity_id: tokenCreationActivity.id,
+      points: tokenCreationActivity.points,
+      user_id: user?.id as number,
+    });
+    await createAccoladeLog({
+      userId: user.id,
+      accoladeName: "Welcome Bonus",
+      accoladeType: "welcome_bonus",
+      description: `You are rewarded with ${tokenCreationActivity?.points} as welcome bonus`,
+      points: tokenCreationActivity?.points,
+    });
+    await storage.updateUserPoints(user.id, tokenCreationActivity?.points || 0);
     return user;
   }
 
   async updateUserPoints(userId: number, points: number): Promise<void> {
-    console.log("updateUserPoints called >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", points)
+    console.log(
+      "updateUserPoints called >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>",
+      points
+    );
     await db
       .update(users)
-      .set({ 
+      .set({
         totalPoints: sql`${users.totalPoints} + ${points}`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateUser_is_paid(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        isPaidUser : true,
+        updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
   }
@@ -161,21 +215,21 @@ export class DatabaseStorage implements IStorage {
   //       updatedAt: users.updatedAt,
   //       isMainAccount: users.isMainAccount,
   //       parentUserId: users.parentUserId
-  //     }) 
+  //     })
   //     .from(users);
 
   //   // Filter to only main accounts and consolidate points from connected wallets
   //   const mainAccounts = usersWithWallets.filter(user => user.isMainAccount);
   //   const consolidatedUsers = mainAccounts.map(mainAccount => {
   //     // Find all connected wallets for this main account
-  //     const connectedWallets = usersWithWallets.filter(user => 
+  //     const connectedWallets = usersWithWallets.filter(user =>
   //       user.parentUserId === mainAccount.id
   //     );
-      
+
   //     // Sum points from main account and all connected wallets
-  //     const totalConsolidatedPoints = mainAccount.totalPoints + 
+  //     const totalConsolidatedPoints = mainAccount.totalPoints +
   //       connectedWallets.reduce((sum, wallet) => sum + wallet.totalPoints, 0);
-      
+
   //     return {
   //       ...mainAccount,
   //       totalPoints: totalConsolidatedPoints
@@ -190,29 +244,29 @@ export class DatabaseStorage implements IStorage {
   //       ...user,
   //       rank: index + 1
   //     }));
-    
+
   //   // Get all accolades for these users and their connected wallets
   //   let userAccolades: Accolade[] = [];
-    
+
   //   if (rankedUsers.length > 0) {
   //     const allUserIds = rankedUsers.flatMap(user => {
   //       const connectedWallets = usersWithWallets.filter(u => u.parentUserId === user.id);
   //       return [user.id, ...connectedWallets.map(w => w.id)];
   //     });
-      
+
   //     userAccolades = await db
   //       .select()
   //       .from(accolades)
   //       .where(inArray(accolades.userId, allUserIds));
   //   }
-    
+
   //   // Group accolades by main user ID (consolidate accolades from connected wallets)
   //   const accoladesByUser: Record<number, Accolade[]> = {};
   //   userAccolades.forEach(accolade => {
   //     // Find the main account for this accolade
   //     const walletUser = usersWithWallets.find(u => u.id === accolade.userId);
   //     const mainAccountId = walletUser?.parentUserId || walletUser?.id;
-      
+
   //     if (mainAccountId) {
   //       if (!accoladesByUser[mainAccountId]) {
   //         accoladesByUser[mainAccountId] = [];
@@ -220,7 +274,7 @@ export class DatabaseStorage implements IStorage {
   //       accoladesByUser[mainAccountId].push(accolade);
   //     }
   //   });
-    
+
   //   // Combine users with their consolidated accolades
   //   return rankedUsers.map(user => ({
   //     ...user,
@@ -250,30 +304,31 @@ export class DatabaseStorage implements IStorage {
         updatedAt: users.updatedAt,
         isMainAccount: users.isMainAccount,
         parentUserId: users.parentUserId,
-        totalPoints: users.totalPoints,  // ✅ use directly
+        totalPoints: users.totalPoints, // ✅ use directly
+        isPaidUser:users.isPaidUser
       })
       .from(users);
-  
+
     // Filter to only main accounts and consolidate points from connected wallets
     const mainAccounts = usersWithWallets.filter((user) => user.isMainAccount);
-  
+
     const consolidatedUsers = mainAccounts.map((mainAccount) => {
       // Find connected wallets
       const connectedWallets = usersWithWallets.filter(
         (u) => u.parentUserId === mainAccount.id
       );
-  
+
       // ✅ Sum totalPoints directly from main + connected wallets
       const totalPoints =
         mainAccount.totalPoints +
         connectedWallets.reduce((sum, w) => sum + (w.totalPoints ?? 0), 0);
-  
+
       return {
         ...mainAccount,
         totalPoints,
       };
     });
-  
+
     // Sort and rank
     const rankedUsers = consolidatedUsers
       .sort((a, b) => b.totalPoints - a.totalPoints)
@@ -282,23 +337,21 @@ export class DatabaseStorage implements IStorage {
         ...user,
         rank: index + 1,
       }));
-  
+
     return rankedUsers;
   }
-  
-  
 
   async getUserRank(userId: number): Promise<number> {
     // Get user's points
     const user = await db.select().from(users).where(eq(users.id, userId));
     if (!user[0]) return 0;
-    
+
     // Count users with more points
     const higherRanked = await db
       .select({ count: count() })
       .from(users)
       .where(sql`${users.totalPoints} > ${user[0].totalPoints}`);
-    
+
     return higherRanked[0].count + 1;
   }
 
@@ -311,28 +364,27 @@ export class DatabaseStorage implements IStorage {
         points: activity.points,
         transactionHash: activity.transactionHash || null,
         blockNumber: activity.blockNumber || null,
-        metadata: activity.metadata || null
+        metadata: activity.metadata || null,
       })
       .returning();
-    
+
     // Update user points
     await this.updateUserPoints(activity.userId, activity.points);
-    
+
     return newActivity;
   }
 
-   async hasTwentyAccolades(userId: number): Promise<boolean> {
+  async hasTwentyAccolades(userId: number): Promise<boolean> {
     const result = await db
       .select({
-        count: sql<number>`COUNT(DISTINCT ${accolades.accoladeType})`
+        count: sql<number>`COUNT(DISTINCT ${accolades.accoladeType})`,
       })
       .from(accolades)
       .where(eq(accolades.userId, userId));
-  
+
     const count = result[0]?.count ?? 0;
     return count >= 20;
   }
-
 
   async checkAccolade(userId: number, accoladeName: string): Promise<boolean> {
     const result = await db
@@ -345,7 +397,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .limit(1);
-  
+
     return result.length > 0;
   }
 
@@ -358,7 +410,9 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getRecentActivities(limit = 20): Promise<Array<Activity & { user: User }>> {
+  async getRecentActivities(
+    limit = 20
+  ): Promise<Array<Activity & { user: User }>> {
     const rows = await db
       .select({
         id: activities.id,
@@ -385,17 +439,18 @@ export class DatabaseStorage implements IStorage {
         user_avatar: users.avatar,
         user_referredBy: users.referredBy,
         user_isInfluencer: users.isInfluencer,
+        user_isPaidUser: users.isPaidUser,
         user_createdAt: users.createdAt,
         user_updatedAt: users.updatedAt,
         user_isMainAccount: users.isMainAccount,
-        user_parentUserId: users.parentUserId
+        user_parentUserId: users.parentUserId,
       })
       .from(activities)
       .innerJoin(users, eq(activities.userId, users.id))
       .orderBy(desc(activities.createdAt))
       .limit(limit);
 
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.id,
       userId: row.userId,
       activityType: row.activityType,
@@ -421,11 +476,12 @@ export class DatabaseStorage implements IStorage {
         avatar: row.user_avatar,
         referredBy: row.user_referredBy,
         isInfluencer: row.user_isInfluencer,
+        isPaidUser: row.user_isPaidUser,
         createdAt: row.user_createdAt,
         updatedAt: row.user_updatedAt,
         isMainAccount: row.user_isMainAccount,
-        parentUserId: row.user_parentUserId
-      }
+        parentUserId: row.user_parentUserId,
+      },
     }));
   }
 
@@ -437,97 +493,101 @@ export class DatabaseStorage implements IStorage {
   //   qualificationAmount: real("qualification_amount").default(0.00).notNull(), // Investment amount for qualification
   //   createdAt: timestamp("created_at", { withTimezone: false }).defaultNow().notNull(),
 
-  async createReferral(referral: InsertReferral): Promise<Referral> { 
+  async createReferral(referral: InsertReferral): Promise<Referral> {
     const [newReferral] = await db
       .insert(referrals)
       .values(referral)
       .returning();
-    
+
     // Award referral points to referrer
     await this.updateUserPoints(referral.referrerId, 500);
-    
+
     return newReferral;
   }
 
   async getUserReferrals(
-  userId: number
-    ): Promise<Array<Referral & { referee: User }>> {
-  const result = await db
-    .select({
-      id: referrals.id,
-      referrerId: referrals.referrerId,
-      refereeId: referrals.refereeId,
-      pointsEarned: referrals.pointsEarned,
-      isQualified: referrals.isQualified, 
-      qualificationAmount: referrals.qualificationAmount,
-      createdAt: referrals.createdAt,
-      referee_id: users.id,
-      referee_walletAddress: users.walletAddress,
-      referee_username: users.username,
-      referee_totalPoints: users.totalPoints,
-      referee_displayName: users.displayName,
-      referee_avatar: users.avatar,
-      referee_bio: users.bio,
-      referee_twitterHandle: users.twitterHandle,
-      referee_discordHandle: users.discordHandle,
-      referee_telegramHandle: users.telegramHandle,
-      referee_websiteUrl: users.websiteUrl,
-      referee_referralCode: users.referralCode,
-      referee_customReferralCode: users.customReferralCode,
-      referee_referredBy: users.referredBy,
-      referee_isInfluencer: users.isInfluencer,
-      referee_createdAt: users.createdAt,
-      referee_updatedAt: users.updatedAt,
-      referee_isMainAccount: users.isMainAccount,
-      referee_parentUserId: users.parentUserId
-    })
-    .from(referrals)
-    .innerJoin(users, eq(referrals.refereeId, users.id))
-    .where(eq(referrals.referrerId, userId))
-    .orderBy(desc(referrals.createdAt));
+    userId: number
+  ): Promise<Array<Referral & { referee: User }>> {
+    const result = await db
+      .select({
+        id: referrals.id,
+        referrerId: referrals.referrerId,
+        refereeId: referrals.refereeId,
+        pointsEarned: referrals.pointsEarned,
+        isQualified: referrals.isQualified,
+        qualificationAmount: referrals.qualificationAmount,
+        createdAt: referrals.createdAt,
+        referee_id: users.id,
+        referee_walletAddress: users.walletAddress,
+        referee_username: users.username,
+        referee_totalPoints: users.totalPoints,
+        referee_displayName: users.displayName,
+        referee_avatar: users.avatar,
+        referee_bio: users.bio,
+        referee_twitterHandle: users.twitterHandle,
+        referee_discordHandle: users.discordHandle,
+        referee_telegramHandle: users.telegramHandle,
+        referee_websiteUrl: users.websiteUrl,
+        referee_referralCode: users.referralCode,
+        referee_customReferralCode: users.customReferralCode,
+        referee_referredBy: users.referredBy,
+        referee_isInfluencer: users.isInfluencer,
+        referee_createdAt: users.createdAt,
+        referee_updatedAt: users.updatedAt,
+        referee_isMainAccount: users.isMainAccount,
+        referee_parentUserId: users.parentUserId,
+        isPaidUser: users.isPaidUser,
+      })
+      .from(referrals)
+      .innerJoin(users, eq(referrals.refereeId, users.id))
+      .where(eq(referrals.referrerId, userId))
+      .orderBy(desc(referrals.createdAt));
 
-  return result.map((row) => ({
-    id: row.id,
-    referrerId: row.referrerId,
-    refereeId: row.refereeId,
-    pointsEarned: row.pointsEarned,
-    isQualified: row.isQualified,
-    qualificationAmount: row.qualificationAmount,
-    createdAt: row.createdAt,
-    referee: {
-      id: row.referee_id,
-      walletAddress: row.referee_walletAddress,
-      username: row.referee_username,
-      totalPoints: row.referee_totalPoints,
-      displayName: row.referee_displayName,
-      avatar: row.referee_avatar,
-      bio: row.referee_bio,
-      twitterHandle: row.referee_twitterHandle,
-      discordHandle: row.referee_discordHandle,
-      telegramHandle: row.referee_telegramHandle,
-      websiteUrl: row.referee_websiteUrl,
-      referralCode: row.referee_referralCode,
-      customReferralCode: row.referee_customReferralCode,
-      referredBy: row.referee_referredBy,
-      isInfluencer: row.referee_isInfluencer,
-      createdAt: row.referee_createdAt,
-      updatedAt: row.referee_updatedAt,
-      isMainAccount: row.referee_isMainAccount,
-      parentUserId: row.referee_parentUserId
-    },
-  }));
+    return result.map((row) => ({
+      id: row.id,
+      referrerId: row.referrerId,
+      refereeId: row.refereeId,
+      pointsEarned: row.pointsEarned,
+      isQualified: row.isQualified,
+      qualificationAmount: row.qualificationAmount,
+      createdAt: row.createdAt,
+      referee: {
+        id: row.referee_id,
+        walletAddress: row.referee_walletAddress,
+        username: row.referee_username,
+        totalPoints: row.referee_totalPoints,
+        displayName: row.referee_displayName,
+        avatar: row.referee_avatar,
+        bio: row.referee_bio,
+        twitterHandle: row.referee_twitterHandle,
+        discordHandle: row.referee_discordHandle,
+        telegramHandle: row.referee_telegramHandle,
+        websiteUrl: row.referee_websiteUrl,
+        referralCode: row.referee_referralCode,
+        customReferralCode: row.referee_customReferralCode,
+        referredBy: row.referee_referredBy,
+        isInfluencer: row.referee_isInfluencer,
+        createdAt: row.referee_createdAt,
+        updatedAt: row.referee_updatedAt,
+        isMainAccount: row.referee_isMainAccount,
+        parentUserId: row.referee_parentUserId,
+        isPaidUser: row.isPaidUser,
+      },
+    }));
   }
 
-  async getReferralStats(userId: number): Promise<{ count: number; totalPoints: number }> {
+  async getReferralStats(
+    userId: number
+  ): Promise<{ count: number; totalPoints: number }> {
     // const { sqlite } = await import('./db');
-     const result = await db
-    .select({
-      count: sql<number>`COUNT(*)`,
-      totalPoints: sql<number>`COALESCE(SUM(${referrals.pointsEarned}), 0)`,
-    })
-    .from(referrals)
-    .where(eq(referrals.referrerId, userId));
-    
+    const result = await db
+      .select({
+        count: sql<number>`COUNT(*)`,
+        totalPoints: sql<number>`COALESCE(SUM(${referrals.pointsEarned}), 0)`,
+      })
+      .from(referrals)
+      .where(eq(referrals.referrerId, userId));
+
     return result[0] ?? { count: 0, totalPoints: 0 };
   }
 
@@ -544,8 +604,8 @@ export class DatabaseStorage implements IStorage {
       .values(accolade)
       .returning();
     // updating the users total_Points
-    await storage.updateUserPoints(accolade.userId , accolade.points?? 0);
-  
+    await storage.updateUserPoints(accolade.userId, accolade.points ?? 0);
+
     return newAccolade;
   }
 
@@ -557,118 +617,131 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGemAccolades(): Promise<GemAccolades[]> {
-    return await db
-      .select()
-      .from(gemAccolades);
-      // .where(eq(gemAccolades.isActive, true));
+    return await db.select().from(gemAccolades);
+    // .where(eq(gemAccolades.isActive, true));
   }
 
-  async updatePointConfig(activityType: string, basePoints: number): Promise<void> {
+  async updatePointConfig(
+    activityType: string,
+    basePoints: number
+  ): Promise<void> {
     await db
       .update(pointConfigs)
-      .set({ 
+      .set({
         basePoints,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(pointConfigs.activityType, activityType));
   }
 
-  async updateGemAccolades(activityType: string, pointsBonus: number): Promise<void> {
+  async updateGemAccolades(
+    activityType: string,
+    pointsBonus: number
+  ): Promise<void> {
     await db
       .update(gemAccolades)
-      .set({ 
-        pointsBonus
+      .set({
+        pointsBonus,
       })
       .where(eq(gemAccolades.symbol, activityType));
   }
-  
 
-  async getReferralLeaderboard(limit = 100): Promise<Array<{ user: User; qualifiedReferrals: number; totalReferralPoints: number; rank: number }>> {
-   const result = await db
-    .select({
-      referrerId: referrals.referrerId,
-      qualifiedReferrals: sql<number>`COUNT(*)`,
-      totalReferralPoints: sql<number>`SUM(${referrals.pointsEarned})`,
-      id: users.id,
-      walletAddress: users.walletAddress,
-      username: users.username,
-      totalPoints: users.totalPoints,
-      referralCode: users.referralCode,
-      displayName: users.displayName,
-      avatar: users.avatar,
-      bio: users.bio,
-      twitterHandle: users.twitterHandle,
-      telegramHandle: users.telegramHandle,
-      discordHandle: users.discordHandle,
-      websiteUrl: users.websiteUrl,
-      customReferralCode: users.customReferralCode,
-      referredBy: users.referredBy,
-      isInfluencer: users.isInfluencer,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-      isMainAccount: users.isMainAccount,
-      parentUserId: users.parentUserId
-    })
-    .from(referrals)
-    .innerJoin(users, eq(referrals.referrerId, users.id))
-    .where(eq(referrals.isQualified, true))
-    .groupBy(
-      referrals.referrerId,
-      users.id,
-      users.walletAddress,
-      users.username,
-      users.totalPoints,
-      users.referralCode,
-      users.displayName,
-      users.avatar,
-      users.bio,
-      users.twitterHandle,
-      users.telegramHandle,
-      users.discordHandle,
-      users.websiteUrl,
-      users.customReferralCode,
-      users.referredBy,
-      users.isInfluencer,
-      users.createdAt,
-      users.updatedAt,
-      users.isMainAccount,
-      users.parentUserId
-    )
-    .orderBy(
-      desc(sql`COUNT(*)`),
-      desc(sql`SUM(${referrals.pointsEarned})`)
-    )
-    .limit(limit);
+  async getReferralLeaderboard(
+    limit = 100
+  ): Promise<
+    Array<{
+      user: User;
+      qualifiedReferrals: number;
+      totalReferralPoints: number;
+      rank: number;
+    }>
+  > {
+    const result = await db
+      .select({
+        referrerId: referrals.referrerId,
+        qualifiedReferrals: sql<number>`COUNT(*)`,
+        totalReferralPoints: sql<number>`SUM(${referrals.pointsEarned})`,
+        id: users.id,
+        walletAddress: users.walletAddress,
+        username: users.username,
+        totalPoints: users.totalPoints,
+        referralCode: users.referralCode,
+        displayName: users.displayName,
+        avatar: users.avatar,
+        bio: users.bio,
+        twitterHandle: users.twitterHandle,
+        telegramHandle: users.telegramHandle,
+        discordHandle: users.discordHandle,
+        websiteUrl: users.websiteUrl,
+        customReferralCode: users.customReferralCode,
+        referredBy: users.referredBy,
+        isInfluencer: users.isInfluencer,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+        isMainAccount: users.isMainAccount,
+        parentUserId: users.parentUserId,
+        isPaidUser : users.isPaidUser
+      })
+      .from(referrals)
+      .innerJoin(users, eq(referrals.referrerId, users.id))
+      .where(eq(referrals.isQualified, true))
+      .groupBy(
+        referrals.referrerId,
+        users.id,
+        users.walletAddress,
+        users.username,
+        users.totalPoints,
+        users.referralCode,
+        users.displayName,
+        users.avatar,
+        users.bio,
+        users.twitterHandle,
+        users.telegramHandle,
+        users.discordHandle,
+        users.websiteUrl,
+        users.customReferralCode,
+        users.referredBy,
+        users.isInfluencer,
+        users.createdAt,
+        users.updatedAt,
+        users.isMainAccount,
+        users.parentUserId
+      )
+      .orderBy(desc(sql`COUNT(*)`), desc(sql`SUM(${referrals.pointsEarned})`))
+      .limit(limit);
 
-  return result.map((row, index) => ({
-    user: {
-      id: row.id,
-      walletAddress: row.walletAddress,
-      username: row.username,
-      totalPoints: row.totalPoints,
-      referralCode: row.referralCode,
-      displayName: row.displayName,
-      avatar: row.avatar,
-      bio: row.bio,
-      twitterHandle: row.twitterHandle,
-      telegramHandle: row.telegramHandle,
-      discordHandle: row.discordHandle,
-      websiteUrl: row.websiteUrl,
-      customReferralCode: row.customReferralCode,
-      referredBy: row.referredBy,
-      isInfluencer: row.isInfluencer,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      isMainAccount: row.isMainAccount,
-      parentUserId: row.parentUserId
-    },
-    qualifiedReferrals: row.qualifiedReferrals,
-    totalReferralPoints: Number(row.totalReferralPoints) || 0,
-    rank: index + 1,
-  }));
+    return result.map((row, index) => ({
+      user: {
+        id: row.id,
+        walletAddress: row.walletAddress,
+        username: row.username,
+        totalPoints: row.totalPoints,
+        referralCode: row.referralCode,
+        displayName: row.displayName,
+        avatar: row.avatar,
+        bio: row.bio,
+        twitterHandle: row.twitterHandle,
+        telegramHandle: row.telegramHandle,
+        discordHandle: row.discordHandle,
+        websiteUrl: row.websiteUrl,
+        customReferralCode: row.customReferralCode,
+        referredBy: row.referredBy,
+        isInfluencer: row.isInfluencer,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        isMainAccount: row.isMainAccount,
+        parentUserId: row.parentUserId,
+        isPaidUser:row.isPaidUser
+      },
+      qualifiedReferrals: row.qualifiedReferrals,
+      totalReferralPoints: Number(row.totalReferralPoints) || 0,
+      rank: index + 1,
+    }));
   }
 
-  async createBlockchainEvent(event: InsertBlockchainEvent): Promise<BlockchainEvent> {
+  async createBlockchainEvent(
+    event: InsertBlockchainEvent
+  ): Promise<BlockchainEvent> {
     const [newEvent] = await db
       .insert(blockchainEvents)
       .values(event)
@@ -691,9 +764,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(blockchainEvents.id, eventId));
   }
 
-  async updateUserProfile(walletAddress: string, profileData: Partial<User>): Promise<User> {
-    console.log('first', walletAddress,
-profileData)
+  async updateUserProfile(
+    walletAddress: string,
+    profileData: Partial<User>
+  ): Promise<User> {
+    console.log("first", walletAddress, profileData);
     const [user] = await db
       .update(users)
       .set({
@@ -713,17 +788,12 @@ profileData)
   }
 
   async addUserWallet(wallet: InsertUserWallet): Promise<UserWallet> {
-    const [newWallet] = await db
-      .insert(userWallets)
-      .values(wallet)
-      .returning();
+    const [newWallet] = await db.insert(userWallets).values(wallet).returning();
     return newWallet;
   }
 
   async removeUserWallet(walletId: number): Promise<void> {
-    await db
-      .delete(userWallets)
-      .where(eq(userWallets.id, walletId));
+    await db.delete(userWallets).where(eq(userWallets.id, walletId));
   }
 
   private generateReferralCode(): string {
@@ -737,7 +807,7 @@ profileData)
     await db.delete(referrals).where(eq(referrals.referrerId, userId));
     await db.delete(referrals).where(eq(referrals.refereeId, userId));
     await db.delete(userWallets).where(eq(userWallets.userId, userId));
-    
+
     // Delete the user
     await db.delete(users).where(eq(users.id, userId));
   }
@@ -746,28 +816,32 @@ profileData)
     const result = await db
       .select({
         accolade: accolades,
-        user: users
+        user: users,
       })
       .from(accolades)
       .innerJoin(users, eq(accolades.userId, users.id))
       .orderBy(users.createdAt);
-    
-    return result.map(r => ({
+
+    return result.map((r) => ({
       ...r.accolade,
-      user: r.user
+      user: r.user,
     }));
   }
   async getAllAccoladesWithoutUser(): Promise<Array<any>> {
-    return await db
-      .select()
-      .from(gemAccolades);
+    return await db.select().from(gemAccolades);
   }
 
   async resetPioneerAccolades(): Promise<void> {
     // Delete pioneer accolades manually
-    await db.delete(accolades).where(eq(accolades.accoladeType, 'genesis_member'));
-    await db.delete(accolades).where(eq(accolades.accoladeType, 'gemlaunch_pioneer'));
-    await db.delete(accolades).where(eq(accolades.accoladeType, 'early_adopter'));
+    await db
+      .delete(accolades)
+      .where(eq(accolades.accoladeType, "genesis_member"));
+    await db
+      .delete(accolades)
+      .where(eq(accolades.accoladeType, "gemlaunch_pioneer"));
+    await db
+      .delete(accolades)
+      .where(eq(accolades.accoladeType, "early_adopter"));
 
     // Get all users sorted by creation date
     const allUsers = await db.select().from(users).orderBy(users.createdAt);
@@ -781,7 +855,7 @@ profileData)
       if (joinOrder <= 10) {
         await this.createAccolade({
           userId: user.id,
-          accoladeType: 'genesis_member',
+          accoladeType: "genesis_member",
           // name: 'Genesis Member'
         });
       }
@@ -790,7 +864,7 @@ profileData)
       if (joinOrder <= 50) {
         await this.createAccolade({
           userId: user.id,
-          accoladeType: 'gemlaunch_pioneer',
+          accoladeType: "gemlaunch_pioneer",
           // name: 'Gemlaunch Pioneer'
         });
       }
@@ -799,7 +873,7 @@ profileData)
       if (joinOrder <= 1000) {
         await this.createAccolade({
           userId: user.id,
-          accoladeType: 'early_adopter',
+          accoladeType: "early_adopter",
           // name: 'Early Adopter'
         });
       }
@@ -809,30 +883,31 @@ profileData)
     for (const user of allUsers) {
       const userAccolades = await this.getUserAccolades(user.id);
       const accoladeBonus = userAccolades.reduce((total, accolade) => {
-        const def = ACCOLADES.find(a => a.symbol === accolade.accoladeType);
+        const def = ACCOLADES.find((a) => a.symbol === accolade.accoladeType);
         return total + (def?.pointsBonus || 0);
       }, 0);
 
       // Get base points from activities
       const userActivities = await this.getUserActivities(user.id);
-      const basePoints = userActivities.reduce((total, activity) => total + activity.points, 0);
+      const basePoints = userActivities.reduce(
+        (total, activity) => total + activity.points,
+        0
+      );
 
       const totalPoints = basePoints + accoladeBonus;
-      
-      await db.update(users)
-        .set({ totalPoints })
-        .where(eq(users.id, user.id));
+
+      await db.update(users).set({ totalPoints }).where(eq(users.id, user.id));
     }
   }
 
-  async grantAccolade (userId: number, accoladeDef: any) {
-  return await storage.createAccolade({
-    userId,
-    accoladeType: accoladeDef.symbol,
-    level: accoladeDef.level,
-    multiplier: accoladeDef.pointsBonus ?? 1,
-  });
-  };
+  async grantAccolade(userId: number, accoladeDef: any) {
+    return await storage.createAccolade({
+      userId,
+      accoladeType: accoladeDef.symbol,
+      level: accoladeDef.level,
+      multiplier: accoladeDef.pointsBonus ?? 1,
+    });
+  }
 
   async updateAccoladeProgress({
     userId,
@@ -863,10 +938,14 @@ profileData)
       if (progress > existing.progress) {
         await db
           .update(accoladeProgress)
-          .set({ progress , completed })
+          .set({ progress, completed })
           .where(eq(accoladeProgress.id, existing.id));
       }
-      return { updated: true, progress: Math.max(progress, existing.progress), target };
+      return {
+        updated: true,
+        progress: Math.max(progress, existing.progress),
+        target,
+      };
     }
 
     // Insert new row
@@ -879,10 +958,7 @@ profileData)
     });
 
     return { created: true, progress, target };
-  };
-
-
-  
+  }
 }
 
 export const storage = new DatabaseStorage();

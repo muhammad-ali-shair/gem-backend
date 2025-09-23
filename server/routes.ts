@@ -29,7 +29,6 @@ import { ActivityKey, PointsEarningActivityTypes } from "./constants";
   const TOKEN_SUBGRAPH = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4"
   const GRAPHQL_URL_TOKEN = "https://api.studio.thegraph.com/query/120239/indexing-gempad-usdc/0.0.4";
   const NEW_GEMLAUNCH_SUBGRAPH = "https://api.studio.thegraph.com/query/111026/test/version/latest"
-//
 
 
 const GRAPHQL_URL = "https://api.studio.thegraph.com/query/120239/gempad/0.0.3";
@@ -1158,6 +1157,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           points
         });
         given = true;
+
+        // making a user paid after is first investment.
+        if(user) { 
+          await storage.updateUser_is_paid(user.id);
+          await insertAccolade( user , 'referrer' );
+        }
         console.log(`[FirstFunderReward] 🎉 Accolade awarded: First Funder (${points} points)`);
       } else {
         console.log(`[FirstFunderReward] ❌ Wallet ${wallet} has purchases but all are 0 BNB`);
@@ -1882,7 +1887,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
       const givenAccolades = await getGivenAccoladesForUser(user.id);
-      console.log({givenAccolades})
+      // console.log({givenAccolades});
+      await insertAccolade( user , 'referrer' );
       await Promise.all([
         tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: givenAccolades.includes("token_creator") }),
         firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funding") }),
