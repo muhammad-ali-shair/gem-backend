@@ -2047,8 +2047,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sendResponse(res, 500, "Invalid wallet address found", null);
       }
       const givenAccolades = await getGivenAccoladesForUser(user.id);
-      // console.log({givenAccolades});
-      await insertAccolade( user , 'referrer' );
       await Promise.all([
         tokenCreatorAndSerialCreator({ wallet: wallet_address, graph: TOKEN_SUBGRAPH, user, launchpadGraph: LAUNCHPAD_SUBGRAPH, isGiven: givenAccolades.includes("token_creator") }),
         firstFunderReward({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("first_funding") }),

@@ -377,7 +377,7 @@ export const insertAccolade = async (
 
       // Step 3: Update progress for the REFERRER, not the referee
       await storage.updateAccoladeProgress({
-        userId: referrerId,               // 🔥 important change
+        userId: referrerId,              
         accoladeId: accoladeDef.id,
         progress: newProgress,
         target,
@@ -387,7 +387,7 @@ export const insertAccolade = async (
       // Step 4: Award accolade if completed
       if (newProgress >= target && !progress?.completed) {
         return await storage.createAccolade({
-          userId: referrerId,             // 🔥 award goes to referrer
+          userId: referrerId,            
           accoladeType: accoladeDef.symbol,
           level: accoladeDef.level,
           multiplier: accoladeDef.pointsBonus ?? 1,
