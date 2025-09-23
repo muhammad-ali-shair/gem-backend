@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   isInfluencer: boolean("is_influencer").default(false).notNull(),
   isMainAccount: boolean("is_main_account").default(true).notNull(),
   parentUserId: integer("parent_user_id"),
+  isPaidUser: boolean("is_paid_user").default(false).notNull(), 
   createdAt: timestamp("created_at", { withTimezone: false }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: false }).defaultNow().notNull(),
 });

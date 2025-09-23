@@ -4,10 +4,11 @@ import {
   accolades,
   gemAccolades,
   insertAccoladeSchema,
+  referrals,
   User,
   users,
 } from "@shared/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "server/db";
 import { storage } from "server/storage";
 import { handleSerialCreator } from "./singleAccolads/handleSerialCreator";
@@ -304,6 +305,106 @@ export const insertAccolade = async (
         target: 20,
       };
     }
+
+    // case "referrer": {
+    //   // Get count of paid referrals from DB
+    //   const { count } = await db
+    //     .select({ count: sql<number>`COUNT(*)` })
+    //     .from(referrals)
+    //     .innerJoin(users, eq(referrals.referrerId, users.id))
+    //     .where(and(eq(referrals.referrerId, userId), eq(users.isPaidUser, true)))
+    //     .then(rows => rows[0]);
+
+    //   const newProgress = count ?? 0; // number of successful referrals
+    //   const target = 5;
+
+    //   // Update progress in storage
+    //   await storage.updateAccoladeProgress({
+    //     userId,
+    //     accoladeId: accoladeDef.id,
+    //     progress: newProgress,
+    //     target,
+    //     completed: newProgress >= target,
+    //   });
+
+    //   // If threshold reached → award accolade
+    //   if (newProgress >= target && !progress?.completed) {
+    //     return await storage.createAccolade({
+    //       userId,
+    //       accoladeType: accoladeDef.symbol,
+    //       level: accoladeDef.level,
+    //       multiplier: accoladeDef.pointsBonus ?? 1,
+    //     });
+    //   }
+
+    //   return {
+    //     message:
+    //       newProgress >= target
+    //         ? "Accolade unlocked!"
+    //         : "Keep referring friends who invest in Gemlaunch projects!",
+    //     progress: newProgress,
+    //     target,
+    //   };
+    // }
+
+    case "referrer": {
+      // Step 1: Find the referrer of this user (if any)
+      const [refRecord] = await db
+        .select({ referrerId: referrals.referrerId })
+        .from(referrals)
+        .where(eq(referrals.refereeId, userId)); // userId is referee here
+
+      if (!refRecord) {
+        return {
+          message: "You don't have a referrer linked.",
+          progress: 0,
+          target: 5,
+        };
+      }
+
+      const referrerId = refRecord.referrerId;
+
+      // Step 2: Count how many paid users this referrer has
+      const { count } = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(referrals)
+        .innerJoin(users, eq(referrals.refereeId, users.id))
+        .where(and(eq(referrals.referrerId, referrerId), eq(users.isPaidUser, true)))
+        .then(rows => rows[0]);
+
+      const newProgress = count ?? 0;
+      const target = 5;
+
+      // Step 3: Update progress for the REFERRER, not the referee
+      await storage.updateAccoladeProgress({
+        userId: referrerId,               // 🔥 important change
+        accoladeId: accoladeDef.id,
+        progress: newProgress,
+        target,
+        completed: newProgress >= target,
+      });
+
+      // Step 4: Award accolade if completed
+      if (newProgress >= target && !progress?.completed) {
+        return await storage.createAccolade({
+          userId: referrerId,             // 🔥 award goes to referrer
+          accoladeType: accoladeDef.symbol,
+          level: accoladeDef.level,
+          multiplier: accoladeDef.pointsBonus ?? 1,
+        });
+      }
+
+      return {
+        message:
+          newProgress >= target
+            ? "Accolade unlocked for your referrer!"
+            : "Keep referring friends who invest in Gemlaunch projects!",
+        progress: newProgress,
+        target,
+      };
+    }
+
+
 
     default:
       return { error: "No logic implemented for this accolade" };
