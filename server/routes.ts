@@ -2052,6 +2052,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         preSaleParticipantHandler({ wallet: wallet_address, graph: NEW_GEMLAUNCH_SUBGRAPH, user, isGiven: givenAccolades.includes("presale_participant") }),
         rankBasedAccolades({ user, wallet: wallet_address })
       ]);
+      let ACCOLADE_COLLECTOR_THRESHOLD = 2;
+      if(!givenAccolades.includes("accolade_collector") && givenAccolades.length >= ACCOLADE_COLLECTOR_THRESHOLD){
+        console.log("[accolade_collector] giving these points")
+        await insertAccoladeInAccolade(user, "accolade_collector");
+        const points = await getAccoladePoints("accolade_collector");
+        await createAccoladeLog({
+          accoladeName: "Accolade Collector",
+          accoladeType: "accolade_collector",
+          userId: user.id,
+          description: "Your Have earned accolade collector accolade",
+          points
+        });
+      }else{
+        console.log("[accolade_collector] skipping......")
+      }
       const accolades = await getAllAccoladesForUser(user.id);
       sendResponse(res, 200, "All accolades fetched successfully", accolades?.rows || []);
     } catch (err) {
