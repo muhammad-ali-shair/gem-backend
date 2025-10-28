@@ -316,14 +316,33 @@ import { and, desc, eq, sql } from "drizzle-orm";
     }
 
     export const createUserActivity = async (input: CreateUserActivityInput) => {
+      // 1️⃣ Check if user already has this activity
+      const existingActivity = await db
+        .select()
+        .from(userPointEarningActivities)
+        .where(
+          and(
+            eq(userPointEarningActivities.userId, input.user_id),
+            eq(userPointEarningActivities.activityId, input.activity_id)
+          )
+        )
+        .limit(1);
+    
+      // 2️⃣ If exists, skip insert
+      if (existingActivity.length > 0) {
+        return null; // or return existingActivity[0] if you prefer
+      }
+    
+      // 3️⃣ Otherwise, insert new record
       const [newActivity] = await db
         .insert(userPointEarningActivities)
         .values({
           userId: input.user_id,
-          activityId:input.activity_id,
+          activityId: input.activity_id,
           points: input.points,
         })
         .returning();
+    
       return newActivity;
     };
 
